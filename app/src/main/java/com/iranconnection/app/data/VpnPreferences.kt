@@ -26,16 +26,16 @@ class VpnPreferences(private val context: Context) {
     }
 
     val connected: Flow<Boolean> =
-        context.dataStore.data.map { it[Keys.CONNECTED] ?: true }
+        context.dataStore.data.map { it[Keys.CONNECTED] ?: false }
 
     val seconds: Flow<Long> =
-        context.dataStore.data.map { it[Keys.SECONDS] ?: 2438L }
+        context.dataStore.data.map { it[Keys.SECONDS] ?: 0L }
 
     val selectedServer: Flow<String?> =
-        context.dataStore.data.map { it[Keys.SELECTED_SERVER] ?: "us" }
+        context.dataStore.data.map { it[Keys.SELECTED_SERVER] }
 
     val enabledApps: Flow<Set<String>> =
-        context.dataStore.data.map { it[Keys.ENABLED_APPS] ?: setOf("melli") }
+        context.dataStore.data.map { it[Keys.ENABLED_APPS] ?: emptySet() }
 
     suspend fun setConnected(value: Boolean) =
         context.dataStore.edit { it[Keys.CONNECTED] = value }

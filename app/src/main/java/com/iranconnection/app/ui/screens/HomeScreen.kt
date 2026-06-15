@@ -48,6 +48,7 @@ import com.iranconnection.app.ui.theme.AppColors
 @Composable
 fun HomeScreen(
     connected: Boolean,
+    statusLabel: String,
     seconds: Long,
     onToggle: () -> Unit,
     onServerCardClick: () -> Unit,
@@ -70,7 +71,7 @@ fun HomeScreen(
             StatusDot(connected, accent)
             Spacer(Modifier.size(7.dp))
             Text(
-                if (connected) "Connection Secure" else "Not Connected",
+                statusLabel,
                 fontSize = 13.sp,
                 fontWeight = FontWeight.SemiBold,
                 color = accent,
@@ -93,9 +94,9 @@ fun HomeScreen(
             Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp),
             horizontalArrangement = Arrangement.Center,
         ) {
-            SpeedStat("20,3", "Download")
+            SpeedStat(if (connected) "20,3" else "0,0", "Download")
             Spacer(Modifier.size(52.dp))
-            SpeedStat("18,3", "Upload")
+            SpeedStat(if (connected) "18,3" else "0,0", "Upload")
         }
 
         // Map + rings + power button

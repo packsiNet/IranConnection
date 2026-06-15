@@ -1,9 +1,13 @@
 package com.iranconnection.app
 
+import android.app.Activity
+import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
@@ -20,12 +24,14 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.iranconnection.app.data.ConfigFetcher
+import com.iranconnection.app.data.VpnStatus
 import com.iranconnection.app.data.VpnViewModel
 import com.iranconnection.app.data.WireGuardConfig
 import com.iranconnection.app.ui.components.AppBottomNav
@@ -80,6 +86,28 @@ class MainActivity : ComponentActivity() {
 private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewModel()) {
     val state by vm.state.collectAsState()
     var tab by remember { mutableStateOf(NavTab.HOME) }
+    val context = LocalContext.current
+
+    val vpnPermissionLauncher = rememberLauncherForActivityResult(
+        ActivityResultContracts.StartActivityForResult()
+    ) { result ->
+        if (result.resultCode == Activity.RESULT_OK) {
+            vm.startTunnel()
+        }
+    }
+
+    val onToggle: () -> Unit = {
+        if (state.status == VpnStatus.CONNECTED || state.status == VpnStatus.CONNECTING) {
+            vm.stopTunnel()
+        } else {
+            val intent = VpnService.prepare(context)
+            if (intent == null) {
+                vm.startTunnel()
+            } else {
+                vpnPermissionLauncher.launch(intent)
+            }
+        }
+    }
 
     Column(
         Modifier
@@ -92,8 +120,9 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
             when (tab) {
                 NavTab.HOME -> HomeScreen(
                     connected = state.connected,
+                    statusLabel = state.statusLabel,
                     seconds = state.seconds,
-                    onToggle = vm::toggleConnection,
+                    onToggle = onToggle,
                     onServerCardClick = { tab = NavTab.SERVERS },
                 )
                 NavTab.SERVERS -> ServersScreen(

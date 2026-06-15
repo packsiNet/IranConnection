@@ -10,19 +10,24 @@ import kotlinx.coroutines.flow.asStateFlow
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.launch
 
-data class VpnUiState(
-    val connected: Boolean = true,
-    val seconds: Long = 2438L,
-    val selectedServerId: String? = "us",
-    val enabledApps: Set<String> = setOf("melli"),
-    val loaded: Boolean = false,
-)
+enum class VpnStatus { DISCONNECTED, CONNECTING, CONNECTED, FAILED }
 
-/**
- * Holds shared connection state for all three screens and drives the live
- * session timer. Equivalent to the prototype's per-page DCLogic state, unified
- * so Home / Servers / Apps stay in sync and survive process death via DataStore.
- */
+data class VpnUiState(
+    val status: VpnStatus = VpnStatus.DISCONNECTED,
+    val seconds: Long = 0L,
+    val selectedServerId: String? = null,
+    val enabledApps: Set<String> = emptySet(),
+    val loaded: Boolean = false,
+) {
+    val connected: Boolean get() = status == VpnStatus.CONNECTED
+    val statusLabel: String get() = when (status) {
+        VpnStatus.DISCONNECTED -> "Not Connected"
+        VpnStatus.CONNECTING   -> "Connecting..."
+        VpnStatus.CONNECTED    -> "Connection Secure"
+        VpnStatus.FAILED       -> "Connection Failed"
+    }
+}
+
 class VpnViewModel(app: Application) : AndroidViewModel(app) {
 
     private val prefs = VpnPreferences(app)
@@ -33,14 +38,13 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
     init {
         viewModelScope.launch {
             _state.value = _state.value.copy(
-                connected = prefs.connected.first(),
-                seconds = prefs.seconds.first(),
+                status = VpnStatus.DISCONNECTED,
+                seconds = 0L,
                 selectedServerId = prefs.selectedServer.first(),
                 enabledApps = prefs.enabledApps.first(),
                 loaded = true,
             )
         }
-        // Tick every second; only advances while connected (matches prototype).
         viewModelScope.launch {
             while (true) {
                 delay(1000)
@@ -54,24 +58,38 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Toggle power button: flips connection and resets timer on (re)connect. */
-    fun toggleConnection() {
-        val nc = !_state.value.connected
-        val newSecs = if (nc) 0L else _state.value.seconds
-        _state.value = _state.value.copy(connected = nc, seconds = newSecs)
+    fun startTunnel() {
+        val context = getApplication<Application>()
+        _state.value = _state.value.copy(status = VpnStatus.CONNECTING, seconds = 0L)
+        WireGuardManager.connect(context)
         viewModelScope.launch {
-            prefs.setConnected(nc)
-            if (nc) prefs.setSeconds(0L)
+            // Poll up to 30 s for IranVpnService to signal isRunning.
+            repeat(30) {
+                delay(1000)
+                if (WireGuardManager.isConnected()) {
+                    _state.value = _state.value.copy(status = VpnStatus.CONNECTED)
+                    prefs.setConnected(true)
+                    return@launch
+                }
+            }
+            if (!WireGuardManager.isConnected()) {
+                _state.value = _state.value.copy(status = VpnStatus.FAILED)
+            }
         }
     }
 
-    /** Select a server (Servers screen). null = disconnect that selection. */
+    fun stopTunnel() {
+        val context = getApplication<Application>()
+        WireGuardManager.disconnect(context)
+        _state.value = _state.value.copy(status = VpnStatus.DISCONNECTED, seconds = 0L)
+        viewModelScope.launch { prefs.setConnected(false) }
+    }
+
     fun selectServer(id: String?) {
         _state.value = _state.value.copy(selectedServerId = id)
         viewModelScope.launch { prefs.setSelectedServer(id) }
     }
 
-    /** Flip a bank app toggle (Apps screen). */
     fun toggleApp(id: String) {
         val cur = _state.value.enabledApps
         val next = if (cur.contains(id)) cur - id else cur + id
