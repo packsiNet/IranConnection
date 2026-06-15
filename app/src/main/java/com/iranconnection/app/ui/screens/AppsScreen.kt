@@ -29,7 +29,6 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
-import androidx.compose.ui.draw.shadow
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.layout.ContentScale
@@ -52,7 +51,7 @@ private sealed interface AppEntry {
         val cardTop: Boolean,
         val cardBottom: Boolean,
     ) : AppEntry
-    object Gap : AppEntry
+    data class Gap(val id: String) : AppEntry
 }
 
 @Composable
@@ -92,7 +91,7 @@ fun AppsScreen(
             freeApps.forEachIndexed { i, app ->
                 add(AppEntry.AppItem(app, divider = i != freeApps.lastIndex, cardTop = i == 0, cardBottom = i == freeApps.lastIndex))
             }
-            add(AppEntry.Gap)
+            add(AppEntry.Gap("free"))
         }
         if (premiumApps.isNotEmpty()) {
             add(AppEntry.Section("Premium Apps", premium = true))
@@ -106,7 +105,7 @@ fun AppsScreen(
                     add(AppEntry.AppItem(app, divider = !lastInCard, cardTop = false, cardBottom = lastInCard))
                 }
             }
-            add(AppEntry.Gap)
+            add(AppEntry.Gap("premium"))
         }
     }
 
@@ -160,7 +159,7 @@ fun AppsScreen(
                     is AppEntry.Section  -> "sec_${entry.text}"
                     is AppEntry.Category -> "cat_${entry.label}"
                     is AppEntry.AppItem  -> "app_${entry.app.packageName}"
-                    AppEntry.Gap         -> "gap_${System.identityHashCode(entry)}"
+                    is AppEntry.Gap      -> "gap_${entry.id}"
                 }
             }) { entry ->
                 when (entry) {
@@ -175,7 +174,7 @@ fun AppsScreen(
                         cardBottom = entry.cardBottom,
                         onSetEnabled = onSetEnabled,
                     )
-                    AppEntry.Gap         -> Spacer(Modifier.height(10.dp))
+                    is AppEntry.Gap      -> Spacer(Modifier.height(10.dp))
                 }
             }
         }
@@ -279,7 +278,6 @@ private fun AppIcon(app: IranianApp, resId: Int) {
             contentDescription = app.nameEn,
             modifier = Modifier
                 .size(36.dp)
-                .shadow(2.dp, shape)
                 .clip(shape),
             contentScale = ContentScale.Crop,
         )
@@ -291,7 +289,6 @@ private fun AppIcon(app: IranianApp, resId: Int) {
         Box(
             Modifier
                 .size(36.dp)
-                .shadow(2.dp, shape, spotColor = c1)
                 .clip(shape)
                 .background(Brush.linearGradient(listOf(c1, c2))),
             contentAlignment = Alignment.Center,
@@ -320,7 +317,6 @@ private fun SlideToggle(isOn: Boolean, onToggle: () -> Unit) {
                 .padding(top = 3.dp)
                 .offset(x = knob)
                 .size(14.dp)
-                .shadow(2.dp, CircleShape)
                 .clip(CircleShape)
                 .background(Color.White),
         )

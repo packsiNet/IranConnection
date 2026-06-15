@@ -23,10 +23,15 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.CircularProgressIndicator
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.alpha
@@ -43,6 +48,7 @@ import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import com.iranconnection.app.ConfigFetchStatus
 import com.iranconnection.app.ui.components.CountryFlag
 import com.iranconnection.app.ui.components.SignalBars
 import com.iranconnection.app.ui.components.WorldMap
@@ -56,7 +62,8 @@ fun HomeScreen(
     serverIp: String?,
     onToggle: () -> Unit,
     onServerCardClick: () -> Unit,
-    onHamburgerClick: () -> Unit = {},
+    onShowLogs: () -> Unit = {},
+    configStatus: ConfigFetchStatus = ConfigFetchStatus.Success,
     buttonEnabled: Boolean = true,
 ) {
     val accent by animateColorAsState(if (connected) AppColors.Teal else AppColors.Red, label = "accent")
@@ -66,7 +73,7 @@ fun HomeScreen(
             .fillMaxSize()
             .background(AppColors.ScreenBg),
     ) {
-        HomeHeader(onHamburgerClick = onHamburgerClick)
+        HomeHeader(configStatus = configStatus, onShowLogs = onShowLogs)
 
         // Connection status
         Row(
@@ -123,33 +130,18 @@ fun HomeScreen(
 }
 
 @Composable
-private fun HomeHeader(onHamburgerClick: () -> Unit = {}) {
+private fun HomeHeader(configStatus: ConfigFetchStatus, onShowLogs: () -> Unit) {
     Row(
         Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
         verticalAlignment = Alignment.CenterVertically,
     ) {
-        // Hamburger
-        Box(
-            Modifier
-                .size(44.dp)
-                .shadow(4.dp, RoundedCornerShape(14.dp))
-                .background(AppColors.CardBg, RoundedCornerShape(14.dp))
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    onClick = onHamburgerClick,
-                ),
-            contentAlignment = Alignment.CenterStart,
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
-            Column(
-                Modifier.padding(horizontal = 12.dp),
-                verticalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Box(Modifier.size(20.dp, 2.dp).background(Color(0xFF3A3A4C), RoundedCornerShape(2.dp)))
-                Box(Modifier.size(12.dp, 2.dp).background(Color(0xFF3A3A4C), RoundedCornerShape(2.dp)))
-                Box(Modifier.size(20.dp, 2.dp).background(Color(0xFF3A3A4C), RoundedCornerShape(2.dp)))
-            }
+            HamburgerMenu(onShowLogs = onShowLogs)
+            ConfigIndicator(configStatus)
         }
         // Premium badge
         Row(
@@ -171,6 +163,76 @@ private fun HomeHeader(onHamburgerClick: () -> Unit = {}) {
                 drawPath(path, AppColors.Gold)
             }
             Text("Premium", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+        }
+    }
+}
+
+/** Hamburger button that opens a dropdown menu. Currently exposes the connection-log viewer. */
+@Composable
+private fun HamburgerMenu(onShowLogs: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    Box {
+        Box(
+            Modifier
+                .size(44.dp)
+                .shadow(4.dp, RoundedCornerShape(14.dp))
+                .background(AppColors.CardBg, RoundedCornerShape(14.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { open = true },
+            contentAlignment = Alignment.CenterStart,
+        ) {
+            Column(
+                Modifier.padding(horizontal = 12.dp),
+                verticalArrangement = Arrangement.spacedBy(5.dp),
+            ) {
+                Box(Modifier.size(20.dp, 2.dp).background(Color(0xFF3A3A4C), RoundedCornerShape(2.dp)))
+                Box(Modifier.size(12.dp, 2.dp).background(Color(0xFF3A3A4C), RoundedCornerShape(2.dp)))
+                Box(Modifier.size(20.dp, 2.dp).background(Color(0xFF3A3A4C), RoundedCornerShape(2.dp)))
+            }
+        }
+        DropdownMenu(expanded = open, onDismissRequest = { open = false }) {
+            DropdownMenuItem(
+                text = { Text("Connection Logs", fontSize = 14.sp, color = AppColors.TextPrimary) },
+                onClick = {
+                    open = false
+                    onShowLogs()
+                },
+            )
+        }
+    }
+}
+
+/** Compact config-load status chip next to the hamburger: spinner while loading, green dot online, red dot offline. */
+@Composable
+private fun ConfigIndicator(status: ConfigFetchStatus) {
+    val color = when (status) {
+        ConfigFetchStatus.Loading -> AppColors.Gold
+        ConfigFetchStatus.Success -> AppColors.Teal
+        ConfigFetchStatus.Error   -> AppColors.Red
+    }
+    Box(
+        Modifier
+            .size(44.dp)
+            .shadow(4.dp, RoundedCornerShape(14.dp))
+            .background(AppColors.CardBg, RoundedCornerShape(14.dp)),
+        contentAlignment = Alignment.Center,
+    ) {
+        if (status == ConfigFetchStatus.Loading) {
+            CircularProgressIndicator(
+                modifier = Modifier.size(18.dp),
+                color = color,
+                strokeWidth = 2.dp,
+            )
+        } else {
+            // Filled dot with a soft outer halo.
+            Box(
+                Modifier.size(18.dp).clip(CircleShape).background(color.copy(alpha = 0.18f)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+            }
         }
     }
 }

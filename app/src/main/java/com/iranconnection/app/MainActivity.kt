@@ -5,6 +5,7 @@ import android.net.VpnService
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
+import androidx.activity.SystemBarStyle
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
@@ -53,7 +54,11 @@ class MainActivity : ComponentActivity() {
     private var configStatus: ConfigFetchStatus by mutableStateOf(ConfigFetchStatus.Loading)
 
     override fun onCreate(savedInstanceState: Bundle?) {
-        enableEdgeToEdge()
+        // Light system bars = dark status/nav icons, so they stay visible on the app's light background.
+        enableEdgeToEdge(
+            statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+            navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
+        )
         super.onCreate(savedInstanceState)
 
         lifecycleScope.launch {
@@ -128,7 +133,6 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
             .statusBarsPadding(),
     ) {
         Column(Modifier.fillMaxSize()) {
-        ConfigStatusBanner(configStatus)
         Column(Modifier.weight(1f)) {
             when (tab) {
                 NavTab.HOME -> HomeScreen(
@@ -138,7 +142,8 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
                     serverIp = state.serverIp,
                     onToggle = onToggle,
                     onServerCardClick = { },
-                    onHamburgerClick = { showLogPanel = true },
+                    onShowLogs = { showLogPanel = true },
+                    configStatus = configStatus,
                     buttonEnabled = buttonEnabled,
                 )
                 NavTab.APPS -> AppsScreen(
@@ -160,25 +165,6 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
             LogScreen(onClose = { showLogPanel = false })
         }
     } // end Box
-}
-
-@Composable
-private fun ConfigStatusBanner(status: ConfigFetchStatus) {
-    val entry = when (status) {
-        ConfigFetchStatus.Loading -> "Fetching config…" to Color(0xFF888888)
-        ConfigFetchStatus.Success -> "Config loaded" to Color(0xFF4BBDB8)
-        ConfigFetchStatus.Error -> "Config unavailable" to Color(0xFFEF4444)
-    }
-    Text(
-        text = entry.first,
-        color = Color.White,
-        fontSize = 12.sp,
-        textAlign = TextAlign.Center,
-        modifier = Modifier
-            .fillMaxWidth()
-            .background(entry.second)
-            .padding(vertical = 4.dp),
-    )
 }
 
 sealed class ConfigFetchStatus {

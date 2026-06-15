@@ -55,18 +55,6 @@ fun AppBottomNav(
                 ProfileIcon(color)
             }
         }
-        // Home indicator pill
-        Row(
-            Modifier.fillMaxWidth().padding(top = 8.dp, bottom = 12.dp),
-            horizontalArrangement = Arrangement.Center,
-        ) {
-            Box(
-                Modifier
-                    .width(122.dp)
-                    .height(4.dp)
-                    .background(AppColors.HomeIndicator, RoundedCornerShape(3.dp))
-            )
-        }
     }
 }
 
