@@ -9,6 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.result.contract.ActivityResultContracts
 import androidx.compose.foundation.background
+import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -38,12 +39,13 @@ import com.iranconnection.app.ui.components.AppBottomNav
 import com.iranconnection.app.ui.components.NavTab
 import com.iranconnection.app.ui.screens.AppsScreen
 import com.iranconnection.app.ui.screens.HomeScreen
+import com.iranconnection.app.ui.screens.LogScreen
 import com.iranconnection.app.ui.screens.ServersScreen
 import com.iranconnection.app.ui.theme.AppColors
 import com.iranconnection.app.ui.theme.IranConnectionTheme
 import kotlinx.coroutines.launch
 
-private const val CONFIG_URL = "https://gist.githubusercontent.com/packsiNet/4358f6d56dcb7cceefb38f6e3a7573ba/raw/7844e4b2e41765585cba6bb1a2745a61eb42c392/config.json"
+private const val CONFIG_URL = "https://gist.githubusercontent.com/packsiNet/4358f6d56dcb7cceefb38f6e3a7573ba/raw/config.json"
 
 class MainActivity : ComponentActivity() {
 
@@ -77,6 +79,9 @@ class MainActivity : ComponentActivity() {
             putString("client_priv_key", config.clientPrivateKey)
             putString("address", config.clientAddress)
             putString("dns", config.dns)
+            if (!config.iranianApps.isNullOrEmpty()) {
+                putString("iranian_apps", config.iranianApps.joinToString(","))
+            }
             apply()
         }
     }
@@ -96,6 +101,8 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
         }
     }
 
+    var showLogPanel by remember { mutableStateOf(false) }
+
     val onToggle: () -> Unit = {
         if (state.status == VpnStatus.CONNECTED || state.status == VpnStatus.CONNECTING) {
             vm.stopTunnel()
@@ -109,12 +116,13 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
         }
     }
 
-    Column(
+    Box(
         Modifier
             .fillMaxSize()
             .background(AppColors.ScreenBg)
             .statusBarsPadding(),
     ) {
+        Column(Modifier.fillMaxSize()) {
         ConfigStatusBanner(configStatus)
         Column(Modifier.weight(1f)) {
             when (tab) {
@@ -122,8 +130,10 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
                     connected = state.connected,
                     statusLabel = state.statusLabel,
                     seconds = state.seconds,
+                    serverIp = state.serverIp,
                     onToggle = onToggle,
                     onServerCardClick = { tab = NavTab.SERVERS },
+                    onHamburgerClick = { showLogPanel = true },
                 )
                 NavTab.SERVERS -> ServersScreen(
                     connectedId = state.selectedServerId,
@@ -142,7 +152,12 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
             onSelect = { tab = it },
             modifier = Modifier.navigationBarsPadding(),
         )
-    }
+        } // end inner Column
+
+        if (showLogPanel) {
+            LogScreen(onClose = { showLogPanel = false })
+        }
+    } // end Box
 }
 
 @Composable

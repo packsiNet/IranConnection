@@ -29,10 +29,13 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.draw.scale
 import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.CornerRadius
 import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
@@ -50,8 +53,10 @@ fun HomeScreen(
     connected: Boolean,
     statusLabel: String,
     seconds: Long,
+    serverIp: String?,
     onToggle: () -> Unit,
     onServerCardClick: () -> Unit,
+    onHamburgerClick: () -> Unit = {},
 ) {
     val accent by animateColorAsState(if (connected) AppColors.Teal else AppColors.Red, label = "accent")
 
@@ -60,7 +65,7 @@ fun HomeScreen(
             .fillMaxSize()
             .background(AppColors.ScreenBg),
     ) {
-        HomeHeader()
+        HomeHeader(onHamburgerClick = onHamburgerClick)
 
         // Connection status
         Row(
@@ -111,13 +116,13 @@ fun HomeScreen(
             PowerButton(connected, accent, onToggle)
         }
 
-        ServerCard(onServerCardClick)
+        ServerCard(connected = connected, serverIp = serverIp, onClick = onServerCardClick)
         Spacer(Modifier.height(12.dp))
     }
 }
 
 @Composable
-private fun HomeHeader() {
+private fun HomeHeader(onHamburgerClick: () -> Unit = {}) {
     Row(
         Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp),
         horizontalArrangement = Arrangement.SpaceBetween,
@@ -128,7 +133,12 @@ private fun HomeHeader() {
             Modifier
                 .size(44.dp)
                 .shadow(4.dp, RoundedCornerShape(14.dp))
-                .background(AppColors.CardBg, RoundedCornerShape(14.dp)),
+                .background(AppColors.CardBg, RoundedCornerShape(14.dp))
+                .clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                    onClick = onHamburgerClick,
+                ),
             contentAlignment = Alignment.CenterStart,
         ) {
             Column(
@@ -253,7 +263,6 @@ private fun PowerButton(connected: Boolean, accent: Color, onToggle: () -> Unit)
             ) { onToggle() },
         contentAlignment = Alignment.Center,
     ) {
-        // glow overlay
         Box(Modifier.fillMaxSize().background(Color.White.copy(alpha = glow)))
         Canvas(Modifier.size(54.dp)) {
             val u = size.width / 54f
@@ -272,14 +281,15 @@ private fun PowerButton(connected: Boolean, accent: Color, onToggle: () -> Unit)
 }
 
 @Composable
-private fun ServerCard(onClick: () -> Unit) {
+private fun ServerCard(connected: Boolean, serverIp: String?, onClick: () -> Unit) {
     Row(
         Modifier
             .fillMaxWidth()
             .padding(horizontal = 18.dp)
+            .alpha(if (connected) 1f else 0.42f)
             .shadow(6.dp, RoundedCornerShape(16.dp))
             .background(AppColors.CardBg, RoundedCornerShape(16.dp))
-            .clickable(onClick = onClick)
+            .then(if (connected) Modifier.clickable(onClick = onClick) else Modifier)
             .padding(horizontal = 14.dp, vertical = 10.dp),
         verticalAlignment = Alignment.CenterVertically,
         horizontalArrangement = Arrangement.spacedBy(12.dp),
@@ -287,25 +297,83 @@ private fun ServerCard(onClick: () -> Unit) {
         CountryFlag("ir", size = 42.dp)
         Column(Modifier.weight(1f)) {
             Text("Iran", fontSize = 15.sp, fontWeight = FontWeight.Bold, color = AppColors.TextPrimary)
-            Row(
-                Modifier.padding(top = 3.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(5.dp),
-            ) {
-                Text("IP 237.147.180.65", fontSize = 12.sp, color = AppColors.TextMuted)
-                Text("•", fontSize = 12.sp, color = AppColors.Chevron)
-                Text("164ms", fontSize = 12.sp, color = AppColors.TextMuted)
-                SignalBars(3)
+            if (connected && serverIp != null) {
+                Row(
+                    Modifier.padding(top = 3.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(5.dp),
+                ) {
+                    Text("IP $serverIp", fontSize = 12.sp, color = AppColors.TextMuted)
+                    Text("•", fontSize = 12.sp, color = AppColors.Chevron)
+                    Text("164ms", fontSize = 12.sp, color = AppColors.TextMuted)
+                    SignalBars(3)
+                }
+            } else {
+                RedactedInfoRow()
             }
         }
-        Canvas(Modifier.size(8.dp, 14.dp)) {
-            val w = size.width / 8f
-            val h = size.height / 14f
-            val p = androidx.compose.ui.graphics.Path().apply {
-                moveTo(1.5f * w, 1.5f * h); lineTo(6.5f * w, 7f * h); lineTo(1.5f * w, 12.5f * h)
+        if (connected) {
+            Canvas(Modifier.size(8.dp, 14.dp)) {
+                val w = size.width / 8f
+                val h = size.height / 14f
+                val p = androidx.compose.ui.graphics.Path().apply {
+                    moveTo(1.5f * w, 1.5f * h); lineTo(6.5f * w, 7f * h); lineTo(1.5f * w, 12.5f * h)
+                }
+                drawPath(p, AppColors.Chevron, style = Stroke(width = 1.8f.dp.toPx(), cap = StrokeCap.Round))
             }
-            drawPath(p, AppColors.Chevron, style = Stroke(width = 1.8f.dp.toPx(), cap = StrokeCap.Round))
+        } else {
+            LockIcon()
         }
+    }
+}
+
+/** Animated shimmer placeholder bars shown instead of IP info when disconnected. */
+@Composable
+private fun RedactedInfoRow() {
+    val t = rememberInfiniteTransition(label = "shimmer")
+    val shimmer by t.animateFloat(
+        0.25f, 0.5f,
+        infiniteRepeatable(tween(900, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "shimmerAlpha",
+    )
+    val barColor = Color(0xFF3A3A4C).copy(alpha = shimmer)
+    Row(
+        Modifier.padding(top = 6.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(5.dp),
+    ) {
+        Box(Modifier.size(46.dp, 7.dp).clip(RoundedCornerShape(4.dp)).background(barColor))
+        Box(Modifier.size(5.dp).clip(CircleShape).background(barColor.copy(alpha = shimmer * 0.6f)))
+        Box(Modifier.size(34.dp, 7.dp).clip(RoundedCornerShape(4.dp)).background(barColor))
+        Box(Modifier.size(5.dp).clip(CircleShape).background(barColor.copy(alpha = shimmer * 0.6f)))
+        Box(Modifier.size(22.dp, 7.dp).clip(RoundedCornerShape(4.dp)).background(barColor))
+    }
+}
+
+/** Lock icon drawn with Canvas, shown in the server card when disconnected. */
+@Composable
+private fun LockIcon() {
+    Canvas(Modifier.size(10.dp, 13.dp)) {
+        val w = size.width
+        val h = size.height
+        val lockColor = Color(0xFF4A4A5C)
+        // Shackle (arc)
+        drawArc(
+            color = lockColor,
+            startAngle = 180f,
+            sweepAngle = 180f,
+            useCenter = false,
+            topLeft = Offset(w * 0.16f, 0f),
+            size = Size(w * 0.68f, h * 0.52f),
+            style = Stroke(width = w * 0.22f, cap = StrokeCap.Round),
+        )
+        // Body (rounded rect)
+        drawRoundRect(
+            color = lockColor,
+            topLeft = Offset(0f, h * 0.44f),
+            size = Size(w, h * 0.56f),
+            cornerRadius = CornerRadius(w * 0.2f),
+        )
     }
 }
 

@@ -47,18 +47,11 @@ data class BankApp(
 )
 
 private val freeApps = listOf(
-    BankApp("melli", "Bank Melli", "بانک ملی ایران", "M", Color(0xFF1A7A3C), Color(0xFF2EBB5E)),
-    BankApp("mellat", "Bank Mellat", "بانک ملت", "ML", Color(0xFFB71C5E), Color(0xFFE91E8C)),
+    BankApp("bluebank", "BluBank", "بلوبانک", "BL", Color(0xFF0D47A1), Color(0xFF1976D2)),
 )
 private val premiumApps = listOf(
-    BankApp("pasargad", "Bank Pasargad", "بانک پاسارگاد", "PA", Color(0xFF1A237E), Color(0xFF3F51B5)),
-    BankApp("parsian", "Bank Parsian", "بانک پارسیان", "PR", Color(0xFF4A148C), Color(0xFF9C27B0)),
     BankApp("saman", "Saman Bank", "بانک سامان", "SM", Color(0xFF01579B), Color(0xFF0288D1)),
-    BankApp("en", "EN Bank", "اقتصاد نوین", "EN", Color(0xFF004D40), Color(0xFF00897B)),
-    BankApp("karafarin", "Karafarin Bank", "بانک کارآفرین", "K", Color(0xFF6A1B9A), Color(0xFFBA68C8)),
-    BankApp("day", "Day Bank", "بانک دی", "D", Color(0xFF33691E), Color(0xFF8BC34A)),
-    BankApp("iranzamin", "Iran Zamin Bank", "بانک ایران زمین", "IZ", Color(0xFFBF360C), Color(0xFFFF5722)),
-    BankApp("ansar", "Ansar Bank", "بانک انصار", "AN", Color(0xFF1B5E20), Color(0xFF4CAF50)),
+    BankApp("parsian", "Bank Parsian", "بانک پارسیان", "PR", Color(0xFF4A148C), Color(0xFF9C27B0)),
 )
 
 @Composable

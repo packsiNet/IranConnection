@@ -18,6 +18,7 @@ data class VpnUiState(
     val selectedServerId: String? = null,
     val enabledApps: Set<String> = emptySet(),
     val loaded: Boolean = false,
+    val serverIp: String? = null,
 ) {
     val connected: Boolean get() = status == VpnStatus.CONNECTED
     val statusLabel: String get() = when (status) {
@@ -59,20 +60,34 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
     }
 
     fun startTunnel() {
+        ConnectionLog.clear()
+        ConnectionLog.add("=== startTunnel ===")
         val context = getApplication<Application>()
-        _state.value = _state.value.copy(status = VpnStatus.CONNECTING, seconds = 0L)
+        val endpoint = context.getSharedPreferences("wireguard", android.content.Context.MODE_PRIVATE)
+            .getString("endpoint", null)
+        ConnectionLog.add("ViewModel: endpoint=$endpoint")
+        val serverIp = endpoint?.let { ep ->
+            if (ep.startsWith("[")) ep.substringBefore("]").removePrefix("[")
+            else ep.substringBeforeLast(":").takeIf { it.isNotEmpty() } ?: ep
+        }
+        _state.value = _state.value.copy(status = VpnStatus.CONNECTING, seconds = 0L, serverIp = serverIp)
         WireGuardManager.connect(context)
         viewModelScope.launch {
-            // Poll up to 30 s for IranVpnService to signal isRunning.
-            repeat(30) {
+            repeat(30) { i ->
                 delay(1000)
-                if (WireGuardManager.isConnected()) {
+                val connected = WireGuardManager.isConnected()
+                if (i == 0 || i % 5 == 4 || connected) {
+                    ConnectionLog.add("Poll ${i + 1}/30: isConnected=$connected")
+                }
+                if (connected) {
+                    ConnectionLog.add("CONNECTED after ${i + 1}s")
                     _state.value = _state.value.copy(status = VpnStatus.CONNECTED)
                     prefs.setConnected(true)
                     return@launch
                 }
             }
             if (!WireGuardManager.isConnected()) {
+                ConnectionLog.add("FAILED: not connected after 30s polling")
                 _state.value = _state.value.copy(status = VpnStatus.FAILED)
             }
         }
@@ -81,7 +96,7 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
     fun stopTunnel() {
         val context = getApplication<Application>()
         WireGuardManager.disconnect(context)
-        _state.value = _state.value.copy(status = VpnStatus.DISCONNECTED, seconds = 0L)
+        _state.value = _state.value.copy(status = VpnStatus.DISCONNECTED, seconds = 0L, serverIp = null)
         viewModelScope.launch { prefs.setConnected(false) }
     }
 

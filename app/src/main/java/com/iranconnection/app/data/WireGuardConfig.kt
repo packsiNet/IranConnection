@@ -9,4 +9,5 @@ data class WireGuardConfig(
     @SerializedName("client_address") val clientAddress: String,
     val dns: String,
     val version: String,
+    @SerializedName("iranian_apps") val iranianApps: List<String>? = null,
 )
