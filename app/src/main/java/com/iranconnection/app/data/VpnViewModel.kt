@@ -1,6 +1,7 @@
 package com.iranconnection.app.data
 
 import android.app.Application
+import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
@@ -18,7 +19,7 @@ data class VpnUiState(
     val status: VpnStatus = VpnStatus.DISCONNECTED,
     val seconds: Long = 0L,
     val selectedServerId: String? = null,
-    val enabledApps: Set<String> = emptySet(),
+    val appToggles: Map<String, Boolean> = emptyMap(),
     val loaded: Boolean = false,
     val serverIp: String? = null,
 ) {
@@ -35,17 +36,21 @@ data class VpnUiState(
 class VpnViewModel(app: Application) : AndroidViewModel(app) {
 
     private val prefs = VpnPreferences(app)
+    private val appPrefs = app.getSharedPreferences("wireguard", Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow(VpnUiState())
     val state: StateFlow<VpnUiState> = _state.asStateFlow()
 
     init {
+        val initialToggles = IranianAppList.apps.associate { iranApp ->
+            iranApp.packageName to appPrefs.getBoolean("app_enabled_${iranApp.packageName}", true)
+        }
         viewModelScope.launch {
             _state.value = _state.value.copy(
                 status = VpnStatus.DISCONNECTED,
                 seconds = 0L,
                 selectedServerId = prefs.selectedServer.first(),
-                enabledApps = prefs.enabledApps.first(),
+                appToggles = initialToggles,
                 loaded = true,
             )
         }
@@ -119,10 +124,9 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
         viewModelScope.launch { prefs.setSelectedServer(id) }
     }
 
-    fun toggleApp(id: String) {
-        val cur = _state.value.enabledApps
-        val next = if (cur.contains(id)) cur - id else cur + id
-        _state.value = _state.value.copy(enabledApps = next)
-        viewModelScope.launch { prefs.setEnabledApps(next) }
+    fun setAppEnabled(pkg: String, enabled: Boolean) {
+        val next = _state.value.appToggles + (pkg to enabled)
+        _state.value = _state.value.copy(appToggles = next)
+        appPrefs.edit().putBoolean("app_enabled_$pkg", enabled).apply()
     }
 }

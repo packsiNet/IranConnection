@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iranconnection.app.ui.theme.AppColors
 
-enum class NavTab { HOME, SERVERS, APPS }
+enum class NavTab { HOME, APPS, PROFILE }
 
 @Composable
 fun AppBottomNav(
@@ -48,11 +48,11 @@ fun AppBottomNav(
             NavItem("Home", selected == NavTab.HOME, onClick = { onSelect(NavTab.HOME) }) { color ->
                 HomeIcon(color, filled = selected == NavTab.HOME)
             }
-            NavItem("Servers", selected == NavTab.SERVERS, onClick = { onSelect(NavTab.SERVERS) }) { color ->
-                GlobeIcon(color)
-            }
             NavItem("Apps", selected == NavTab.APPS, onClick = { onSelect(NavTab.APPS) }) { color ->
                 AppsIcon(color)
+            }
+            NavItem("Profile", selected == NavTab.PROFILE, onClick = { onSelect(NavTab.PROFILE) }) { color ->
+                ProfileIcon(color)
             }
         }
         // Home indicator pill

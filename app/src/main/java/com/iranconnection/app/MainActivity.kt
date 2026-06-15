@@ -40,6 +40,7 @@ import com.iranconnection.app.ui.components.NavTab
 import com.iranconnection.app.ui.screens.AppsScreen
 import com.iranconnection.app.ui.screens.HomeScreen
 import com.iranconnection.app.ui.screens.LogScreen
+import com.iranconnection.app.ui.screens.ProfileScreen
 import com.iranconnection.app.ui.screens.ServersScreen
 import com.iranconnection.app.ui.theme.AppColors
 import com.iranconnection.app.ui.theme.IranConnectionTheme
@@ -136,20 +137,16 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
                     seconds = state.seconds,
                     serverIp = state.serverIp,
                     onToggle = onToggle,
-                    onServerCardClick = { tab = NavTab.SERVERS },
+                    onServerCardClick = { },
                     onHamburgerClick = { showLogPanel = true },
                     buttonEnabled = buttonEnabled,
                 )
-                NavTab.SERVERS -> ServersScreen(
-                    connectedId = state.selectedServerId,
-                    onSelect = vm::selectServer,
-                    onClose = { tab = NavTab.HOME },
-                )
                 NavTab.APPS -> AppsScreen(
-                    enabled = state.enabledApps,
-                    onToggle = vm::toggleApp,
+                    appToggles = state.appToggles,
+                    onSetEnabled = vm::setAppEnabled,
                     onClose = { tab = NavTab.HOME },
                 )
+                NavTab.PROFILE -> ProfileScreen()
             }
         }
         AppBottomNav(

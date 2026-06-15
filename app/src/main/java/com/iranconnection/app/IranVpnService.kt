@@ -7,9 +7,8 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.ServiceCompat
 import com.iranconnection.app.data.ConnectionLog
-import com.iranconnection.app.data.VpnPreferences
+import com.iranconnection.app.data.IranianAppList
 import com.iranconnection.app.data.WireGuardManager
-import kotlinx.coroutines.flow.first
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import kotlinx.coroutines.CoroutineScope
@@ -54,33 +53,18 @@ class IranVpnService : GoBackend.VpnService() {
         scope.launch {
             try {
                 val prefs = getSharedPreferences("wireguard", Context.MODE_PRIVATE)
-                val appsString = prefs.getString("iranian_apps", "") ?: ""
-                ConnectionLog.add("iranian_apps pref: '${appsString.take(120)}'")
-                android.util.Log.d("IranVpn", "raw pref value: $appsString")
-
-                val userEnabled = VpnPreferences(this@IranVpnService).enabledApps.first()
-                val chromePackages = if (userEnabled.contains("chrome"))
-                    listOf("com.android.chrome", "com.google.android.apps.chrome") else emptyList()
-
-                val configuredApps = (if (appsString.isNotEmpty()) {
-                    appsString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
-                } else {
-                    WireGuardManager.DEFAULT_IRANIAN_APPS
-                } + chromePackages).distinct()
-                ConnectionLog.add("configuredApps (${configuredApps.size}): ${configuredApps.joinToString()}")
-                android.util.Log.d("IranVpn", "split result: $configuredApps")
-
-                configuredApps.forEach { pkg ->
-                    val installed = try {
-                        packageManager.getPackageInfo(pkg.trim(), 0)
-                        true
-                    } catch (e: PackageManager.NameNotFoundException) {
-                        false
+                val enabledPkgs = IranianAppList.apps
+                    .filter { app -> prefs.getBoolean("app_enabled_${app.packageName}", true) }
+                    .flatMap { app ->
+                        // Chrome exists under two package names on some devices
+                        if (app.packageName == "com.android.chrome")
+                            listOf("com.android.chrome", "com.google.android.apps.chrome")
+                        else listOf(app.packageName)
                     }
-                    android.util.Log.d("IranVpn", "checking: '$pkg' → installed=$installed")
-                }
+                    .distinct()
+                ConnectionLog.add("enabled apps (${enabledPkgs.size})")
 
-                val installedApps = configuredApps.filter { pkg ->
+                val installedApps = enabledPkgs.filter { pkg ->
                     try {
                         packageManager.getPackageInfo(pkg, 0)
                         true
@@ -89,7 +73,7 @@ class IranVpnService : GoBackend.VpnService() {
                         false
                     }
                 }
-                ConnectionLog.add("installedApps (${installedApps.size}): ${installedApps.joinToString()}")
+                ConnectionLog.add("installedApps (${installedApps.size}): ${installedApps.take(5).joinToString()}...")
 
                 if (installedApps.isEmpty()) {
                     ConnectionLog.add("ERROR: no Iranian apps installed — aborting")

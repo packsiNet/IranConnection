@@ -82,4 +82,20 @@ fun AppsIcon(color: Color, modifier: Modifier = Modifier.size24()) {
     }
 }
 
+@Composable
+fun ProfileIcon(color: Color, modifier: Modifier = Modifier.size24()) {
+    Canvas(modifier) {
+        val u = size.width / 24f
+        // Head circle
+        drawCircle(color, radius = 4f * u, center = Offset(12f * u, 7.5f * u), style = Stroke(width = 1.5f * u))
+        // Shoulders arc
+        val path = androidx.compose.ui.graphics.Path().apply {
+            moveTo(4f * u, 20.5f * u)
+            cubicTo(4f * u, 16.5f * u, 8f * u, 13.5f * u, 12f * u, 13.5f * u)
+            cubicTo(16f * u, 13.5f * u, 20f * u, 16.5f * u, 20f * u, 20.5f * u)
+        }
+        drawPath(path, color, style = Stroke(width = 1.5f * u, cap = StrokeCap.Round))
+    }
+}
+
 private fun Modifier.size24() = this.then(Modifier.size(24.dp))
