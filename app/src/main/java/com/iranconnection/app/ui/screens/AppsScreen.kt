@@ -47,6 +47,7 @@ data class BankApp(
 )
 
 private val freeApps = listOf(
+    BankApp("chrome", "Google Chrome", "مرورگر کروم", "G", Color(0xFF1A73E8), Color(0xFF4285F4)),
     BankApp("bluebank", "BluBank", "بلوبانک", "BL", Color(0xFF0D47A1), Color(0xFF1976D2)),
 )
 private val premiumApps = listOf(

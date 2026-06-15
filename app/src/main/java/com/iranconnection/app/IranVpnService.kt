@@ -7,7 +7,9 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.ServiceCompat
 import com.iranconnection.app.data.ConnectionLog
+import com.iranconnection.app.data.VpnPreferences
 import com.iranconnection.app.data.WireGuardManager
+import kotlinx.coroutines.flow.first
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import kotlinx.coroutines.CoroutineScope
@@ -56,11 +58,15 @@ class IranVpnService : GoBackend.VpnService() {
                 ConnectionLog.add("iranian_apps pref: '${appsString.take(120)}'")
                 android.util.Log.d("IranVpn", "raw pref value: $appsString")
 
-                val configuredApps = if (appsString.isNotEmpty()) {
+                val userEnabled = VpnPreferences(this@IranVpnService).enabledApps.first()
+                val chromePackages = if (userEnabled.contains("chrome"))
+                    listOf("com.android.chrome", "com.google.android.apps.chrome") else emptyList()
+
+                val configuredApps = (if (appsString.isNotEmpty()) {
                     appsString.split(",").map { it.trim() }.filter { it.isNotEmpty() }
                 } else {
                     WireGuardManager.DEFAULT_IRANIAN_APPS
-                }
+                } + chromePackages).distinct()
                 ConnectionLog.add("configuredApps (${configuredApps.size}): ${configuredApps.joinToString()}")
                 android.util.Log.d("IranVpn", "split result: $configuredApps")
 
