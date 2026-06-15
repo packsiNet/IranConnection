@@ -103,15 +103,19 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
 
     var showLogPanel by remember { mutableStateOf(false) }
 
+    // Button is disabled while a transition is in flight to block double-taps.
+    val buttonEnabled = state.status != VpnStatus.CONNECTING && state.status != VpnStatus.DISCONNECTING
     val onToggle: () -> Unit = {
-        if (state.status == VpnStatus.CONNECTED || state.status == VpnStatus.CONNECTING) {
-            vm.stopTunnel()
-        } else {
-            val intent = VpnService.prepare(context)
-            if (intent == null) {
-                vm.startTunnel()
-            } else {
-                vpnPermissionLauncher.launch(intent)
+        when (state.status) {
+            VpnStatus.CONNECTED -> vm.stopTunnel()
+            VpnStatus.CONNECTING, VpnStatus.DISCONNECTING -> { /* in transition — ignore */ }
+            else -> {
+                val intent = VpnService.prepare(context)
+                if (intent == null) {
+                    vm.startTunnel()
+                } else {
+                    vpnPermissionLauncher.launch(intent)
+                }
             }
         }
     }
@@ -134,6 +138,7 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
                     onToggle = onToggle,
                     onServerCardClick = { tab = NavTab.SERVERS },
                     onHamburgerClick = { showLogPanel = true },
+                    buttonEnabled = buttonEnabled,
                 )
                 NavTab.SERVERS -> ServersScreen(
                     connectedId = state.selectedServerId,

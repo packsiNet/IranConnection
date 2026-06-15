@@ -57,6 +57,7 @@ fun HomeScreen(
     onToggle: () -> Unit,
     onServerCardClick: () -> Unit,
     onHamburgerClick: () -> Unit = {},
+    buttonEnabled: Boolean = true,
 ) {
     val accent by animateColorAsState(if (connected) AppColors.Teal else AppColors.Red, label = "accent")
 
@@ -113,7 +114,7 @@ fun HomeScreen(
         ) {
             WorldMap(Modifier.fillMaxSize())
             PulseRings(connected)
-            PowerButton(connected, accent, onToggle)
+            PowerButton(connected, accent, buttonEnabled, onToggle)
         }
 
         ServerCard(connected = connected, serverIp = serverIp, onClick = onServerCardClick)
@@ -239,7 +240,7 @@ private fun PulseRings(connected: Boolean) {
 }
 
 @Composable
-private fun PowerButton(connected: Boolean, accent: Color, onToggle: () -> Unit) {
+private fun PowerButton(connected: Boolean, accent: Color, enabled: Boolean, onToggle: () -> Unit) {
     val t = rememberInfiniteTransition(label = "glow")
     val glow by t.animateFloat(
         0f, 0.12f,
@@ -260,6 +261,7 @@ private fun PowerButton(connected: Boolean, accent: Color, onToggle: () -> Unit)
             .clickable(
                 interactionSource = remember { MutableInteractionSource() },
                 indication = null,
+                enabled = enabled,
             ) { onToggle() },
         contentAlignment = Alignment.Center,
     ) {
