@@ -9,7 +9,6 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
-import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -64,25 +63,8 @@ fun BrowserAddressBar(
     Column(
         modifier = modifier
             .fillMaxWidth()
-            .background(Color.White)
-            .navigationBarsPadding(),
+            .background(Color.White),
     ) {
-        // Progress bar
-        if (isLoading) {
-            LinearProgressIndicator(
-                progress = { progress / 100f },
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(2.dp),
-                color = Color(0xFF1A73E8),
-                trackColor = Color.Transparent,
-            )
-        } else {
-            Box(modifier = Modifier.height(2.dp))
-        }
-
-        HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 0.5.dp)
-
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -179,5 +161,20 @@ fun BrowserAddressBar(
                 )
             }
         }
+
+        // Progress bar + divider sit under the row (bar is at top of screen).
+        if (isLoading) {
+            LinearProgressIndicator(
+                progress = { progress / 100f },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(2.dp),
+                color = Color(0xFF1A73E8),
+                trackColor = Color.Transparent,
+            )
+        } else {
+            Box(modifier = Modifier.height(2.dp))
+        }
+        HorizontalDivider(color = Color(0xFFE0E0E0), thickness = 0.5.dp)
     }
 }
