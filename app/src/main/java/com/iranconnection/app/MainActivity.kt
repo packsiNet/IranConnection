@@ -39,6 +39,7 @@ import com.iranconnection.app.data.WireGuardConfig
 import com.iranconnection.app.ui.components.AppBottomNav
 import com.iranconnection.app.ui.components.NavTab
 import com.iranconnection.app.ui.screens.AppsScreen
+import com.iranconnection.app.ui.screens.BrowserScreen
 import com.iranconnection.app.ui.screens.HomeScreen
 import com.iranconnection.app.ui.screens.LogScreen
 import com.iranconnection.app.ui.screens.ProfileScreen
@@ -151,6 +152,7 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
                 NavTab.APPS -> AppsScreen(
                     onClose = { tab = NavTab.HOME },
                 )
+                NavTab.BROWSER -> BrowserScreen()
                 NavTab.PROFILE -> ProfileScreen()
             }
         }

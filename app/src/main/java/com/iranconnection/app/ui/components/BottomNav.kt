@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import com.iranconnection.app.ui.theme.AppColors
 
-enum class NavTab { HOME, APPS, PROFILE }
+enum class NavTab { HOME, APPS, BROWSER, PROFILE }
 
 @Composable
 fun AppBottomNav(
@@ -50,6 +50,9 @@ fun AppBottomNav(
             }
             NavItem("Apps", selected == NavTab.APPS, onClick = { onSelect(NavTab.APPS) }) { color ->
                 AppsIcon(color)
+            }
+            NavItem("browser", selected == NavTab.BROWSER, onClick = { onSelect(NavTab.BROWSER) }) { color ->
+                GlobeIcon(color)
             }
             NavItem("Profile", selected == NavTab.PROFILE, onClick = { onSelect(NavTab.PROFILE) }) { color ->
                 ProfileIcon(color)

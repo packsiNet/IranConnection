@@ -53,7 +53,7 @@ fun ProfileScreen() {
     var email    by rememberSaveable { mutableStateOf(prefs.getString("ic_email", "") ?: "") }
     var key      by rememberSaveable { mutableStateOf("") }
     var keyVisible by rememberSaveable { mutableStateOf(false) }
-    var plan     by rememberSaveable { mutableStateOf("monthly") }
+    var currency by rememberSaveable { mutableStateOf("usd") }
 
     val doEnter = {
         if (email.isNotBlank()) {
@@ -84,8 +84,8 @@ fun ProfileScreen() {
         } else {
             ProfileView(
                 email = email,
-                plan = plan,
-                onPlanChange = { plan = it },
+                currency = currency,
+                onCurrencyChange = { currency = it },
                 onExit = doExit,
             )
         }
@@ -148,7 +148,7 @@ private fun AccessView(
                     fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = Color.White,
                     letterSpacing = (-0.6).sp, lineHeight = 24.sp)
                 Spacer(Modifier.height(5.dp))
-                Text("Secure global access — IR",
+                Text("Secure global access · IR",
                     fontSize = 11.5.sp, color = Color.White.copy(alpha = 0.55f), fontWeight = FontWeight.Normal)
             }
         }
@@ -187,7 +187,7 @@ private fun AccessView(
             )
 
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Text("Reset access key",
+                Text("Forgot password?",
                     fontSize = 11.5.sp, color = TealStart, fontWeight = FontWeight.SemiBold)
             }
 
@@ -211,7 +211,7 @@ private fun AccessView(
                         ),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("Access Account",
+                    Text("Sign In",
                         fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
@@ -231,8 +231,8 @@ private fun AccessView(
 @Composable
 private fun ProfileView(
     email: String,
-    plan: String,
-    onPlanChange: (String) -> Unit,
+    currency: String,
+    onCurrencyChange: (String) -> Unit,
     onExit: () -> Unit,
 ) {
     // No embedded bottom nav here — the Profile tab reuses the same shared
@@ -256,7 +256,7 @@ private fun ProfileView(
         }
 
         // 3. Renew card
-        RenewCard(plan = plan, onPlanChange = onPlanChange)
+        RenewCard(currency = currency, onCurrencyChange = onCurrencyChange)
 
         // 4. Menu list
         MenuCard()
@@ -434,72 +434,136 @@ private fun StatCard(
 
 // ---- Renew card ----
 @Composable
-private fun RenewCard(plan: String, onPlanChange: (String) -> Unit) {
+private fun RenewCard(currency: String, onCurrencyChange: (String) -> Unit) {
+    val usd = currency == "usd"
+    val invoiceTotal = if (usd) "$2.50" else "300,000 TMN"
+    val payLabel     = if (usd) "Pay $2.50 →" else "Pay 300,000 TMN →"
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
-            .shadow(12.dp, RoundedCornerShape(22.dp), spotColor = GoldMid)
-            .clip(RoundedCornerShape(22.dp))
+            .shadow(12.dp, RoundedCornerShape(20.dp), spotColor = GoldMid)
+            .clip(RoundedCornerShape(20.dp))
             .background(Brush.linearGradient(
                 colors = listOf(GoldStart, GoldMid, GoldEnd),
                 start = Offset(0f, 0f), end = Offset(400f, 400f)
             ))
-            .padding(horizontal = 15.dp, vertical = 15.dp)
+            .padding(horizontal = 13.dp, vertical = 13.dp)
     ) {
-        RingDecor(size = 84.dp, borderWidth = 17.dp, alpha = 0.10f,
-            modifier = Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-22).dp))
+        RingDecor(size = 76.dp, borderWidth = 15.dp, alpha = 0.09f,
+            modifier = Modifier.align(Alignment.TopEnd).offset(x = 6.dp, y = (-18).dp))
 
         Column {
+            // Header
             Text("MEMBERSHIP",
-                fontSize = 9.5.sp, color = Color.White.copy(alpha = 0.6f), letterSpacing = 1.sp)
-            Spacer(Modifier.height(2.dp))
-            Text("Renew Premium Access",
-                fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = Color.White,
-                letterSpacing = (-0.3).sp, modifier = Modifier.padding(bottom = 11.dp))
+                fontSize = 9.5.sp, color = Color.White.copy(alpha = 0.52f), letterSpacing = 0.9.sp)
+            Spacer(Modifier.height(1.dp))
+            Text("Renew Monthly Premium",
+                fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color.White,
+                letterSpacing = (-0.2).sp, modifier = Modifier.padding(bottom = 10.dp))
 
-            // Plan toggle
+            // Two currency tabs
             Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(5.dp)
+            ) {
+                CurrencyTab(
+                    active = usd, top = "MONTHLY · USD", amount = "$2.50", amountSize = 20.sp,
+                    bottom = "per month", onClick = { onCurrencyChange("usd") })
+                CurrencyTab(
+                    active = !usd, top = "MONTHLY · TMN", amount = "300,000", amountSize = 15.sp,
+                    bottom = "Toman / month", onClick = { onCurrencyChange("tmn") })
+            }
+
+            Spacer(Modifier.height(9.dp))
+
+            // Mini invoice
+            Column(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(11.dp))
-                    .background(Color.Black.copy(alpha = 0.13f))
-                    .padding(4.dp),
-                horizontalArrangement = Arrangement.spacedBy(4.dp)
+                    .background(Color.White.copy(alpha = 0.13f))
+                    .border(1.dp, Color.White.copy(alpha = 0.20f), RoundedCornerShape(11.dp))
+                    .padding(horizontal = 11.dp, vertical = 9.dp)
             ) {
-                listOf("monthly" to "Monthly · $4.99", "yearly" to "Yearly · $39.99").forEach { (planKey, label) ->
-                    val active = plan == planKey
-                    Box(
-                        modifier = Modifier
-                            .weight(1f)
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(if (active) Color.White else Color.Transparent)
-                            .clickable { onPlanChange(planKey) }
-                            .padding(vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(label,
-                            fontSize = 11.5.sp,
-                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
-                            color = if (active) Color(0xFFB87209) else Color.White.copy(alpha = 0.6f))
-                    }
+                InvoiceRow("Plan", "Monthly Premium", valueBold = true)
+                Spacer(Modifier.height(4.dp))
+                InvoiceRow("Duration", "30 days", valueBold = false)
+                Spacer(Modifier.height(6.dp))
+                Box(modifier = Modifier
+                    .fillMaxWidth()
+                    .height(1.dp)
+                    .background(Color.White.copy(alpha = 0.14f)))
+                Spacer(Modifier.height(6.dp))
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("TOTAL", fontSize = 9.sp, color = Color.White.copy(alpha = 0.52f), letterSpacing = 0.5.sp)
+                    Text(invoiceTotal, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
+                        color = Color.White, letterSpacing = (-0.3).sp)
                 }
             }
 
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(8.dp))
 
-            // Renew button
+            // Pay button
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(9.dp))
                     .background(Color.White)
+                    .clickable {}
                     .padding(vertical = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text("Renew Now →",
-                    fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB87209))
+                Text(payLabel,
+                    fontSize = 12.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFB87209))
             }
         }
+    }
+}
+
+@Composable
+private fun RowScope.CurrencyTab(
+    active: Boolean,
+    top: String,
+    amount: String,
+    amountSize: androidx.compose.ui.unit.TextUnit,
+    bottom: String,
+    onClick: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .weight(1f)
+            .then(if (active) Modifier.shadow(6.dp, RoundedCornerShape(10.dp)) else Modifier)
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (active) Color.White else Color.Black.copy(alpha = 0.13f))
+            .clickable { onClick() }
+            .padding(horizontal = 7.dp, vertical = 8.dp),
+        horizontalAlignment = Alignment.CenterHorizontally,
+        verticalArrangement = Arrangement.spacedBy(2.dp)
+    ) {
+        Text(top, fontSize = 8.sp, fontWeight = FontWeight.SemiBold, letterSpacing = 0.5.sp,
+            color = if (active) Color(0xFF9A9A9A) else Color.White.copy(alpha = 0.58f))
+        Text(amount, fontSize = amountSize, fontWeight = FontWeight.ExtraBold,
+            color = if (active) Color(0xFFB87209) else Color.White, letterSpacing = (-0.4).sp)
+        Text(bottom, fontSize = 8.sp, fontWeight = FontWeight.Medium,
+            color = if (active) Color(0xFFC8A060) else Color.White.copy(alpha = 0.42f))
+    }
+}
+
+@Composable
+private fun InvoiceRow(label: String, value: String, valueBold: Boolean) {
+    Row(
+        modifier = Modifier.fillMaxWidth(),
+        horizontalArrangement = Arrangement.SpaceBetween
+    ) {
+        Text(label, fontSize = 9.5.sp, color = Color.White.copy(alpha = 0.52f))
+        Text(value, fontSize = 10.sp,
+            fontWeight = if (valueBold) FontWeight.Bold else FontWeight.Normal,
+            color = if (valueBold) Color.White else Color.White.copy(alpha = 0.84f))
     }
 }
 
@@ -511,23 +575,8 @@ private fun MenuCard() {
             iconBg = Color(0xFFEAF8F8), iconColor = TealStart,
             title = "Support Tickets", subtitle = "2 open requests",
             badge = "2", badgeBg = TealStart,
-            icon = { c: DrawScope -> c.drawSupportIcon() }
-        ),
-        MenuRowData(
-            iconBg = Color(0xFFFFF7E8), iconColor = Color(0xFFF5A620),
-            title = "Transaction History", subtitle = "Last: Jun 12 · $4.99",
-            icon = { c: DrawScope -> c.drawCardIcon() }
-        ),
-        MenuRowData(
-            iconBg = Color(0xFFEEF2FF), iconColor = Color(0xFF6C7FD8),
-            title = "Account Details", subtitle = "Edit profile & info",
-            icon = { c: DrawScope -> c.drawPersonIcon() }
-        ),
-        MenuRowData(
-            iconBg = Color(0xFFF3F0FF), iconColor = Color(0xFF8B68E8),
-            title = "Update Credentials", subtitle = "Changed 30 days ago",
             isLast = true,
-            icon = { c: DrawScope -> c.drawLockMenuIcon() }
+            icon = { c: DrawScope -> c.drawSupportIcon() }
         ),
     )
 
@@ -725,40 +774,4 @@ private fun DrawScope.drawSupportIcon() {
     drawLine(TealStart, Offset(size.width * 0.31f, size.height * 0.66f), Offset(size.width * 0.69f, size.height * 0.66f), 1.8f, cap = StrokeCap.Round)
 }
 
-private fun DrawScope.drawCardIcon() {
-    val color = Color(0xFFF5A620)
-    val s = Stroke(1.8f)
-    drawRoundRect(color, topLeft = Offset(size.width * 0.094f, size.height * 0.25f),
-        size = androidx.compose.ui.geometry.Size(size.width * 0.812f, size.height * 0.53f),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(5f), style = s)
-    drawLine(color, Offset(size.width * 0.094f, size.height * 0.44f), Offset(size.width * 0.906f, size.height * 0.44f), 1.8f)
-    drawLine(color, Offset(size.width * 0.28f, size.height * 0.66f), Offset(size.width * 0.47f, size.height * 0.66f), 2f, cap = StrokeCap.Round)
-}
-
-private fun DrawScope.drawPersonIcon() {
-    val color = Color(0xFF6C7FD8)
-    val s = Stroke(1.8f, cap = StrokeCap.Round)
-    drawCircle(color, radius = size.minDimension * 0.175f, center = Offset(size.width / 2, size.height * 0.375f), style = s)
-    drawPath(Path().apply {
-        moveTo(size.width * 0.156f, size.height * 0.9375f)
-        cubicTo(size.width * 0.156f, size.width * 0.765f, size.width * 0.31f, size.height * 0.625f,
-            size.width / 2, size.height * 0.625f)
-        cubicTo(size.width * 0.69f, size.height * 0.625f, size.width * 0.844f, size.width * 0.765f,
-            size.width * 0.844f, size.height * 0.9375f)
-    }, color, style = s)
-}
-
-private fun DrawScope.drawLockMenuIcon() {
-    val color = Color(0xFF8B68E8)
-    val s = Stroke(1.8f, cap = StrokeCap.Round)
-    drawRoundRect(color, topLeft = Offset(size.width * 0.172f, size.height * 0.484f),
-        size = androidx.compose.ui.geometry.Size(size.width * 0.656f, size.height * 0.469f),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(5f), style = s)
-    drawPath(Path().apply {
-        moveTo(size.width * 0.3125f, size.height * 0.484f); lineTo(size.width * 0.3125f, size.height * 0.344f)
-        cubicTo(size.width * 0.3125f, size.height * 0.24f, size.width * 0.5f, size.height * 0.156f,
-            size.width * 0.6875f, size.height * 0.344f); lineTo(size.width * 0.6875f, size.height * 0.484f)
-    }, color, style = s)
-    drawCircle(color, radius = size.minDimension * 0.075f, center = Offset(size.width / 2, size.height * 0.719f))
-}
 
