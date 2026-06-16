@@ -1,10 +1,10 @@
 package com.iranconnection.app.data
 
 import android.app.Application
-import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
 import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -19,7 +19,6 @@ data class VpnUiState(
     val status: VpnStatus = VpnStatus.DISCONNECTED,
     val seconds: Long = 0L,
     val selectedServerId: String? = null,
-    val appToggles: Map<String, Boolean> = emptyMap(),
     val loaded: Boolean = false,
     val serverIp: String? = null,
 ) {
@@ -36,21 +35,16 @@ data class VpnUiState(
 class VpnViewModel(app: Application) : AndroidViewModel(app) {
 
     private val prefs = VpnPreferences(app)
-    private val appPrefs = app.getSharedPreferences("wireguard", Context.MODE_PRIVATE)
 
     private val _state = MutableStateFlow(VpnUiState())
     val state: StateFlow<VpnUiState> = _state.asStateFlow()
 
     init {
-        val initialToggles = IranianAppList.apps.associate { iranApp ->
-            iranApp.packageName to appPrefs.getBoolean("app_enabled_${iranApp.packageName}", true)
-        }
         viewModelScope.launch {
             _state.value = _state.value.copy(
                 status = VpnStatus.DISCONNECTED,
                 seconds = 0L,
                 selectedServerId = prefs.selectedServer.first(),
-                appToggles = initialToggles,
                 loaded = true,
             )
         }
@@ -67,13 +61,15 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    private var connectingJob: Job? = null
+
     fun startTunnel() {
         ConnectionLog.clear()
         ConnectionLog.add("=== startTunnel ===")
         val context = getApplication<Application>()
         // Show CONNECTING instantly so the button feels responsive.
         _state.value = _state.value.copy(status = VpnStatus.CONNECTING, seconds = 0L, serverIp = null)
-        viewModelScope.launch {
+        connectingJob = viewModelScope.launch {
             // Read prefs + start the tunnel off the main thread.
             val serverIp = withContext(Dispatchers.IO) {
                 val endpoint = context.getSharedPreferences("wireguard", android.content.Context.MODE_PRIVATE)
@@ -102,6 +98,16 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
+    /** Lets the user cancel a connect attempt that's taking too long, instead of being stuck waiting on it. */
+    fun cancelConnecting() {
+        if (_state.value.status != VpnStatus.CONNECTING) return
+        ConnectionLog.add("=== cancelConnecting ===")
+        // Stop the in-flight connect poll first so it can't overwrite the DISCONNECTING/DISCONNECTED
+        // state that stopTunnel() is about to set.
+        connectingJob?.cancel()
+        stopTunnel()
+    }
+
     fun stopTunnel() {
         val context = getApplication<Application>()
         // Show DISCONNECTING instantly; tunnel teardown runs in background.
@@ -122,11 +128,5 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
     fun selectServer(id: String?) {
         _state.value = _state.value.copy(selectedServerId = id)
         viewModelScope.launch { prefs.setSelectedServer(id) }
-    }
-
-    fun setAppEnabled(pkg: String, enabled: Boolean) {
-        val next = _state.value.appToggles + (pkg to enabled)
-        _state.value = _state.value.copy(appToggles = next)
-        appPrefs.edit().putBoolean("app_enabled_$pkg", enabled).apply()
     }
 }

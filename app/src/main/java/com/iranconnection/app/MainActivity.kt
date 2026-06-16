@@ -109,12 +109,14 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
 
     var showLogPanel by remember { mutableStateOf(false) }
 
-    // Button is disabled while a transition is in flight to block double-taps.
-    val buttonEnabled = state.status != VpnStatus.CONNECTING && state.status != VpnStatus.DISCONNECTING
+    // Button stays tappable while connecting so the user can cancel a connect attempt that's
+    // taking too long; it's only disabled mid-disconnect, where there's nothing left to cancel.
+    val buttonEnabled = state.status != VpnStatus.DISCONNECTING
     val onToggle: () -> Unit = {
         when (state.status) {
             VpnStatus.CONNECTED -> vm.stopTunnel()
-            VpnStatus.CONNECTING, VpnStatus.DISCONNECTING -> { /* in transition — ignore */ }
+            VpnStatus.CONNECTING -> vm.cancelConnecting()
+            VpnStatus.DISCONNECTING -> { /* in transition — ignore */ }
             else -> {
                 val intent = VpnService.prepare(context)
                 if (intent == null) {
@@ -147,8 +149,6 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
                     buttonEnabled = buttonEnabled,
                 )
                 NavTab.APPS -> AppsScreen(
-                    appToggles = state.appToggles,
-                    onSetEnabled = vm::setAppEnabled,
                     onClose = { tab = NavTab.HOME },
                 )
                 NavTab.PROFILE -> ProfileScreen()

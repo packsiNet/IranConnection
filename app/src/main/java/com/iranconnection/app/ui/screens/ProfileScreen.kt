@@ -1,40 +1,764 @@
 package com.iranconnection.app.ui.screens
 
-import androidx.compose.foundation.background
-import androidx.compose.foundation.layout.Arrangement
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.Column
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.size
+import androidx.compose.animation.core.*
+import androidx.compose.foundation.*
+import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.shape.CircleShape
-import androidx.compose.material3.Text
-import androidx.compose.runtime.Composable
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.text.BasicTextField
+import androidx.compose.foundation.text.KeyboardOptions
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.shadow
+import androidx.compose.ui.geometry.Offset
+import androidx.compose.ui.graphics.*
+import androidx.compose.ui.graphics.drawscope.DrawScope
+import androidx.compose.ui.graphics.drawscope.Stroke
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import com.iranconnection.app.ui.theme.AppColors
+import androidx.compose.ui.text.input.KeyboardType
+import androidx.compose.ui.text.input.PasswordVisualTransformation
+import androidx.compose.ui.text.input.VisualTransformation
+import androidx.compose.ui.text.style.TextOverflow
+import androidx.compose.ui.unit.*
 
+// ---- Color palette (Profile-screen specific) ----
+private val TealStart   = Color(0xFF3DBFBA)
+private val TealMid     = Color(0xFF279491)
+private val TealEnd     = Color(0xFF195E5C)
+private val GoldStart   = Color(0xFFFBCF42)
+private val GoldMid     = Color(0xFFF5A620)
+private val GoldEnd     = Color(0xFFE48808)
+private val TextPrimary = Color(0xFF18182A)
+private val TextMuted   = Color(0xFFA0AAB8)
+private val TextHint    = Color(0xFFC2CAD6)
+private val Divider     = Color(0xFFF2F4F8)
+private val Chevron     = Color(0xFFD0D6E0)
+private val BgScreen    = Color(0xFFF0F2F6)
+private val CardWhite   = Color.White
+private val Amber       = Color(0xFFFBBF24)
+private val Red         = Color(0xFFEF4444)
+
+// ---- Main screen ----
 @Composable
 fun ProfileScreen() {
-    Column(
-        Modifier.fillMaxSize().background(AppColors.ScreenBg),
-        horizontalAlignment = Alignment.CenterHorizontally,
-        verticalArrangement = Arrangement.Center,
-    ) {
-        Box(
-            Modifier
-                .size(72.dp)
-                .clip(CircleShape)
-                .background(AppColors.Teal),
-            contentAlignment = Alignment.Center,
-        ) {
-            Text("IC", fontSize = 24.sp, fontWeight = FontWeight.Bold, color = androidx.compose.ui.graphics.Color.White)
+    val context = LocalContext.current
+    val prefs = remember { context.getSharedPreferences("ic_auth", android.content.Context.MODE_PRIVATE) }
+
+    var loggedIn by rememberSaveable { mutableStateOf(prefs.getString("ic_auth", null) == "1") }
+    var email    by rememberSaveable { mutableStateOf(prefs.getString("ic_email", "") ?: "") }
+    var key      by rememberSaveable { mutableStateOf("") }
+    var keyVisible by rememberSaveable { mutableStateOf(false) }
+    var plan     by rememberSaveable { mutableStateOf("monthly") }
+
+    val doEnter = {
+        if (email.isNotBlank()) {
+            prefs.edit().putString("ic_auth", "1").putString("ic_email", email).apply()
+            loggedIn = true
         }
-        androidx.compose.foundation.layout.Spacer(Modifier.size(16.dp))
-        Text("IranConnection", fontSize = 18.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-        Text("Version 1.0", fontSize = 13.sp, color = AppColors.TextMuted)
+    }
+    val doExit = {
+        prefs.edit().remove("ic_auth").remove("ic_email").apply()
+        loggedIn = false; email = ""; key = ""; keyVisible = false
+    }
+
+    Box(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgScreen)
+    ) {
+        if (!loggedIn) {
+            AccessView(
+                email = email,
+                onEmailChange = { email = it },
+                accessKey = key,
+                onKeyChange = { key = it },
+                keyVisible = keyVisible,
+                onToggleVis = { keyVisible = !keyVisible },
+                onEnter = doEnter,
+            )
+        } else {
+            ProfileView(
+                email = email,
+                plan = plan,
+                onPlanChange = { plan = it },
+                onExit = doExit,
+            )
+        }
     }
 }
+
+// ---- Access view (login) ----
+@Composable
+private fun AccessView(
+    email: String,
+    onEmailChange: (String) -> Unit,
+    accessKey: String,
+    onKeyChange: (String) -> Unit,
+    keyVisible: Boolean,
+    onToggleVis: () -> Unit,
+    onEnter: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+    ) {
+        // Hero gradient card
+        Box(
+            modifier = Modifier
+                .padding(start = 12.dp, end = 12.dp, top = 10.dp)
+                .fillMaxWidth()
+                .shadow(elevation = 20.dp, shape = RoundedCornerShape(28.dp), spotColor = TealMid)
+                .clip(RoundedCornerShape(28.dp))
+                .background(
+                    Brush.linearGradient(
+                        colors = listOf(TealStart, TealMid, TealEnd),
+                        start = Offset(0f, 0f), end = Offset(600f, 600f)
+                    )
+                )
+                .padding(horizontal = 24.dp, vertical = 32.dp)
+        ) {
+            // Decorative rings
+            RingDecor(size = 130.dp, borderWidth = 26.dp, alpha = 0.06f,
+                modifier = Modifier.align(Alignment.TopEnd).offset(x = 28.dp, y = (-28).dp))
+            RingDecor(size = 96.dp, borderWidth = 20.dp, alpha = 0.05f,
+                modifier = Modifier.align(Alignment.BottomEnd).offset(x = (-30).dp, y = 44.dp))
+            RingDecor(size = 70.dp, borderWidth = 14.dp, alpha = 0.04f,
+                modifier = Modifier.align(Alignment.BottomStart).offset(x = (-18).dp, y = (-20).dp))
+
+            Column {
+                // Globe icon box
+                Box(
+                    modifier = Modifier
+                        .size(52.dp)
+                        .clip(RoundedCornerShape(17.dp))
+                        .background(Color.White.copy(alpha = 0.15f))
+                        .border(1.5.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(17.dp)),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Canvas(modifier = Modifier.size(28.dp)) { drawGlobeIcon() }
+                }
+                Spacer(Modifier.height(18.dp))
+                Text("IranConnection",
+                    fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = Color.White,
+                    letterSpacing = (-0.6).sp, lineHeight = 24.sp)
+                Spacer(Modifier.height(5.dp))
+                Text("Secure global access — IR",
+                    fontSize = 11.5.sp, color = Color.White.copy(alpha = 0.55f), fontWeight = FontWeight.Normal)
+            }
+        }
+
+        // Form section
+        Column(
+            modifier = Modifier.padding(horizontal = 14.dp, vertical = 20.dp),
+            verticalArrangement = Arrangement.spacedBy(9.dp)
+        ) {
+            Text("Welcome back",
+                fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary,
+                letterSpacing = (-0.3).sp, modifier = Modifier.padding(bottom = 3.dp))
+
+            // Email field
+            AuthField(
+                value = email,
+                onValueChange = onEmailChange,
+                placeholder = "Email address",
+                keyboardType = KeyboardType.Email,
+                leadingIcon = { Canvas(Modifier.size(15.dp, 12.dp)) { drawMailIcon() } }
+            )
+
+            // Access key field
+            AuthField(
+                value = accessKey,
+                onValueChange = onKeyChange,
+                placeholder = "Access key",
+                keyboardType = KeyboardType.Password,
+                visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
+                leadingIcon = { Canvas(Modifier.size(14.dp, 17.dp)) { drawLockIcon() } },
+                trailingIcon = {
+                    IconButton(onClick = onToggleVis, modifier = Modifier.size(32.dp)) {
+                        Canvas(Modifier.size(16.dp)) { drawEyeIcon(keyVisible) }
+                    }
+                }
+            )
+
+            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
+                Text("Reset access key",
+                    fontSize = 11.5.sp, color = TealStart, fontWeight = FontWeight.SemiBold)
+            }
+
+            // Access button
+            Button(
+                onClick = onEnter,
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(46.dp)
+                    .shadow(12.dp, RoundedCornerShape(13.dp), spotColor = TealMid),
+                shape = RoundedCornerShape(13.dp),
+                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
+                contentPadding = PaddingValues(0.dp)
+            ) {
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize()
+                        .background(
+                            Brush.linearGradient(listOf(Color(0xFF4ECAC5), TealMid)),
+                            RoundedCornerShape(13.dp)
+                        ),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("Access Account",
+                        fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+
+            Row(
+                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
+                horizontalArrangement = Arrangement.Center
+            ) {
+                Text("New here? ", fontSize = 11.5.sp, color = TextMuted)
+                Text("Create account", fontSize = 11.5.sp, color = TealStart, fontWeight = FontWeight.Bold)
+            }
+        }
+    }
+}
+
+// ---- Profile view (logged in) ----
+@Composable
+private fun ProfileView(
+    email: String,
+    plan: String,
+    onPlanChange: (String) -> Unit,
+    onExit: () -> Unit,
+) {
+    // No embedded bottom nav here — the Profile tab reuses the same shared
+    // tab bar (AppBottomNav) that Home and Apps already render in MainActivity.
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        // 1. Profile hero card
+        ProfileHeroCard(email = email)
+
+        // 2. Mini stats row
+        Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatCard(modifier = Modifier.weight(1f), label = "↓ Download", value = "28.1", unit = "GB", barPct = 0.72f,
+                barBrush = Brush.horizontalGradient(listOf(Color(0xFF68D0CA), TealStart)))
+            StatCard(modifier = Modifier.weight(1f), label = "↑ Upload", value = "17.1", unit = "GB", barPct = 0.43f,
+                barBrush = Brush.horizontalGradient(listOf(Color(0xFF9DD8D6), Color(0xFF68D0CA))))
+        }
+
+        // 3. Renew card
+        RenewCard(plan = plan, onPlanChange = onPlanChange)
+
+        // 4. Menu list
+        MenuCard()
+
+        // 5. Exit button
+        Button(
+            onClick = onExit,
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedCornerShape(15.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = CardWhite),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+        ) {
+            Text("Exit Session", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Red)
+        }
+
+        Spacer(Modifier.height(2.dp))
+    }
+}
+
+// ---- Profile hero card ----
+@Composable
+private fun ProfileHeroCard(email: String) {
+    val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
+        initialValue = 1f, targetValue = 0.4f,
+        animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
+        label = "pulseAlpha"
+    )
+
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(16.dp, RoundedCornerShape(24.dp), spotColor = TealMid)
+            .clip(RoundedCornerShape(24.dp))
+            .background(Brush.linearGradient(
+                colors = listOf(TealStart, TealMid, TealEnd),
+                start = Offset(0f, 0f), end = Offset(600f, 500f)
+            ))
+            .padding(horizontal = 16.dp, vertical = 18.dp)
+    ) {
+        RingDecor(size = 110.dp, borderWidth = 22.dp, alpha = 0.07f,
+            modifier = Modifier.align(Alignment.TopEnd).offset(x = 18.dp, y = (-18).dp))
+        RingDecor(size = 80.dp, borderWidth = 16.dp, alpha = 0.05f,
+            modifier = Modifier.align(Alignment.BottomCenter).offset(y = 36.dp))
+
+        Column {
+            // Avatar row
+            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(11.dp)) {
+                // Avatar circle
+                Box(
+                    modifier = Modifier
+                        .size(44.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.2f))
+                        .border(2.dp, Color.White.copy(alpha = 0.3f), CircleShape),
+                    contentAlignment = Alignment.Center
+                ) {
+                    Text("A", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                }
+
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Ali Mohammadi",
+                        fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White,
+                        letterSpacing = (-0.2).sp)
+                    Text(email.ifBlank { "ali@example.com" },
+                        fontSize = 10.5.sp, color = Color.White.copy(alpha = 0.55f),
+                        maxLines = 1, overflow = TextOverflow.Ellipsis,
+                        modifier = Modifier.padding(top = 2.dp))
+                }
+
+                // Premium badge
+                Row(
+                    modifier = Modifier
+                        .clip(RoundedCornerShape(18.dp))
+                        .background(Color.White.copy(alpha = 0.16f))
+                        .border(1.dp, Color.White.copy(alpha = 0.26f), RoundedCornerShape(18.dp))
+                        .padding(horizontal = 9.dp, vertical = 4.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(4.dp)
+                ) {
+                    Box(modifier = Modifier
+                        .size(5.dp)
+                        .clip(CircleShape)
+                        .background(Amber.copy(alpha = pulse)))
+                    Text("Premium", fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
+
+            // Stats box
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(Color.Black.copy(alpha = 0.15f))
+                    .padding(horizontal = 13.dp, vertical = 11.dp),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                Column {
+                    Text("ACTIVE UNTIL",
+                        fontSize = 9.5.sp, color = Color.White.copy(alpha = 0.5f), letterSpacing = 0.9.sp)
+                    Spacer(Modifier.height(2.dp))
+                    Text("Jul 12, 2026",
+                        fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White, letterSpacing = (-0.2).sp)
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text("REMAINING",
+                        fontSize = 9.5.sp, color = Color.White.copy(alpha = 0.5f), letterSpacing = 0.9.sp)
+                    Spacer(Modifier.height(2.dp))
+                    Text("28 days",
+                        fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
+                }
+            }
+
+            // Days progress bar
+            Spacer(Modifier.height(10.dp))
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(5.dp)
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White.copy(alpha = 0.18f))
+            ) {
+                Box(modifier = Modifier
+                    .fillMaxWidth(0.93f)
+                    .fillMaxHeight()
+                    .clip(RoundedCornerShape(3.dp))
+                    .background(Color.White.copy(alpha = 0.78f)))
+            }
+        }
+    }
+}
+
+// ---- Stat card ----
+@Composable
+private fun StatCard(
+    modifier: Modifier,
+    label: String,
+    value: String,
+    unit: String,
+    barPct: Float,
+    barBrush: Brush,
+) {
+    Column(
+        modifier = modifier
+            .shadow(4.dp, RoundedCornerShape(17.dp))
+            .clip(RoundedCornerShape(17.dp))
+            .background(CardWhite)
+            .padding(horizontal = 13.dp, vertical = 13.dp)
+    ) {
+        Text(label.uppercase(),
+            fontSize = 9.5.sp, color = TextMuted, letterSpacing = 0.8.sp,
+            modifier = Modifier.padding(bottom = 5.dp))
+        Row(verticalAlignment = Alignment.Bottom) {
+            Text(value, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = TextPrimary, letterSpacing = (-0.5).sp)
+            Spacer(Modifier.width(2.dp))
+            Text(unit, fontSize = 10.5.sp, fontWeight = FontWeight.Medium, color = TextMuted)
+        }
+        Spacer(Modifier.height(7.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .height(4.dp)
+                .clip(RoundedCornerShape(2.dp))
+                .background(Color(0xFFEFF1F6))
+        ) {
+            Box(modifier = Modifier
+                .fillMaxWidth(barPct)
+                .fillMaxHeight()
+                .clip(RoundedCornerShape(2.dp))
+                .background(barBrush))
+        }
+    }
+}
+
+// ---- Renew card ----
+@Composable
+private fun RenewCard(plan: String, onPlanChange: (String) -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(12.dp, RoundedCornerShape(22.dp), spotColor = GoldMid)
+            .clip(RoundedCornerShape(22.dp))
+            .background(Brush.linearGradient(
+                colors = listOf(GoldStart, GoldMid, GoldEnd),
+                start = Offset(0f, 0f), end = Offset(400f, 400f)
+            ))
+            .padding(horizontal = 15.dp, vertical = 15.dp)
+    ) {
+        RingDecor(size = 84.dp, borderWidth = 17.dp, alpha = 0.10f,
+            modifier = Modifier.align(Alignment.TopEnd).offset(x = 8.dp, y = (-22).dp))
+
+        Column {
+            Text("MEMBERSHIP",
+                fontSize = 9.5.sp, color = Color.White.copy(alpha = 0.6f), letterSpacing = 1.sp)
+            Spacer(Modifier.height(2.dp))
+            Text("Renew Premium Access",
+                fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = Color.White,
+                letterSpacing = (-0.3).sp, modifier = Modifier.padding(bottom = 11.dp))
+
+            // Plan toggle
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(11.dp))
+                    .background(Color.Black.copy(alpha = 0.13f))
+                    .padding(4.dp),
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                listOf("monthly" to "Monthly · $4.99", "yearly" to "Yearly · $39.99").forEach { (planKey, label) ->
+                    val active = plan == planKey
+                    Box(
+                        modifier = Modifier
+                            .weight(1f)
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(if (active) Color.White else Color.Transparent)
+                            .clickable { onPlanChange(planKey) }
+                            .padding(vertical = 8.dp),
+                        contentAlignment = Alignment.Center
+                    ) {
+                        Text(label,
+                            fontSize = 11.5.sp,
+                            fontWeight = if (active) FontWeight.Bold else FontWeight.Medium,
+                            color = if (active) Color(0xFFB87209) else Color.White.copy(alpha = 0.6f))
+                    }
+                }
+            }
+
+            Spacer(Modifier.height(10.dp))
+
+            // Renew button
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(9.dp))
+                    .background(Color.White)
+                    .padding(vertical = 10.dp),
+                contentAlignment = Alignment.Center
+            ) {
+                Text("Renew Now →",
+                    fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color(0xFFB87209))
+            }
+        }
+    }
+}
+
+// ---- Menu card ----
+@Composable
+private fun MenuCard() {
+    val items = listOf(
+        MenuRowData(
+            iconBg = Color(0xFFEAF8F8), iconColor = TealStart,
+            title = "Support Tickets", subtitle = "2 open requests",
+            badge = "2", badgeBg = TealStart,
+            icon = { c: DrawScope -> c.drawSupportIcon() }
+        ),
+        MenuRowData(
+            iconBg = Color(0xFFFFF7E8), iconColor = Color(0xFFF5A620),
+            title = "Transaction History", subtitle = "Last: Jun 12 · $4.99",
+            icon = { c: DrawScope -> c.drawCardIcon() }
+        ),
+        MenuRowData(
+            iconBg = Color(0xFFEEF2FF), iconColor = Color(0xFF6C7FD8),
+            title = "Account Details", subtitle = "Edit profile & info",
+            icon = { c: DrawScope -> c.drawPersonIcon() }
+        ),
+        MenuRowData(
+            iconBg = Color(0xFFF3F0FF), iconColor = Color(0xFF8B68E8),
+            title = "Update Credentials", subtitle = "Changed 30 days ago",
+            isLast = true,
+            icon = { c: DrawScope -> c.drawLockMenuIcon() }
+        ),
+    )
+
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(4.dp, RoundedCornerShape(20.dp))
+            .clip(RoundedCornerShape(20.dp))
+            .background(CardWhite)
+    ) {
+        items.forEach { item ->
+            MenuRow(item = item)
+            if (!item.isLast) {
+                HorizontalDivider(color = Divider, thickness = 1.dp)
+            }
+        }
+    }
+}
+
+private data class MenuRowData(
+    val iconBg: Color,
+    val iconColor: Color,
+    val title: String,
+    val subtitle: String,
+    val badge: String? = null,
+    val badgeBg: Color = Color.Transparent,
+    val isLast: Boolean = false,
+    val icon: (DrawScope) -> Unit,
+)
+
+@Composable
+private fun MenuRow(item: MenuRowData) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clickable {}
+            .padding(horizontal = 14.dp, vertical = 12.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(11.dp)
+    ) {
+        // Icon box
+        Box(
+            modifier = Modifier
+                .size(34.dp)
+                .clip(RoundedCornerShape(11.dp))
+                .background(item.iconBg),
+            contentAlignment = Alignment.Center
+        ) {
+            Canvas(modifier = Modifier.size(16.dp)) { item.icon(this) }
+        }
+
+        Column(modifier = Modifier.weight(1f)) {
+            Text(item.title, fontSize = 12.5.sp, fontWeight = FontWeight.SemiBold, color = TextPrimary)
+            Spacer(Modifier.height(1.dp))
+            Text(item.subtitle, fontSize = 10.5.sp, color = TextMuted)
+        }
+
+        // Optional badge
+        if (item.badge != null) {
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(7.dp))
+                    .background(item.badgeBg)
+                    .padding(horizontal = 6.dp, vertical = 2.dp)
+            ) {
+                Text(item.badge, fontSize = 9.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
+            }
+        }
+
+        // Chevron
+        Canvas(modifier = Modifier.size(5.dp, 10.dp)) {
+            val path = Path().apply {
+                moveTo(0f, 0f); lineTo(size.width, size.height / 2); lineTo(0f, size.height)
+            }
+            drawPath(path, color = Chevron, style = Stroke(width = 3f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+        }
+    }
+}
+
+// ---- Auth field ----
+@Composable
+private fun AuthField(
+    value: String,
+    onValueChange: (String) -> Unit,
+    placeholder: String,
+    keyboardType: KeyboardType = KeyboardType.Text,
+    visualTransformation: VisualTransformation = VisualTransformation.None,
+    leadingIcon: @Composable () -> Unit,
+    trailingIcon: (@Composable () -> Unit)? = null,
+) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(4.dp, RoundedCornerShape(13.dp), spotColor = Color(0xFF000000).copy(alpha = 0.06f))
+            .clip(RoundedCornerShape(13.dp))
+            .background(CardWhite)
+            .border(1.dp, Color(0xFFEAECF2), RoundedCornerShape(13.dp))
+            .padding(horizontal = 14.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(10.dp)
+    ) {
+        leadingIcon()
+        BasicTextField(
+            value = value,
+            onValueChange = onValueChange,
+            modifier = Modifier.weight(1f).padding(vertical = 12.dp),
+            singleLine = true,
+            keyboardOptions = KeyboardOptions(keyboardType = keyboardType),
+            visualTransformation = visualTransformation,
+            textStyle = androidx.compose.ui.text.TextStyle(
+                fontSize = 12.5.sp, color = TextPrimary,
+                fontFamily = androidx.compose.ui.text.font.FontFamily.Default
+            ),
+            decorationBox = { inner ->
+                if (value.isEmpty()) {
+                    Text(placeholder, fontSize = 12.5.sp, color = TextHint)
+                }
+                inner()
+            }
+        )
+        trailingIcon?.invoke()
+    }
+}
+
+// ---- Decorative ring ----
+@Composable
+private fun RingDecor(size: Dp, borderWidth: Dp, alpha: Float, modifier: Modifier = Modifier) {
+    Box(
+        modifier = modifier
+            .size(size)
+            .clip(CircleShape)
+            .border(borderWidth, Color.White.copy(alpha = alpha), CircleShape)
+    )
+}
+
+// ---- Canvas drawing helpers ----
+private fun DrawScope.drawGlobeIcon() {
+    val cx = size.width / 2; val cy = size.height / 2; val r = size.minDimension * 0.34f
+    val stroke = Stroke(width = 2f, cap = StrokeCap.Round)
+    drawCircle(color = Color.White, radius = r, center = Offset(cx, cy), style = stroke)
+    drawPath(Path().apply {
+        moveTo(cx, cy - r); cubicTo(cx - r * 0.7f, cy - r * 0.4f, cx - r * 0.7f, cy + r * 0.4f, cx, cy + r)
+    }, Color.White, style = stroke)
+    drawPath(Path().apply {
+        moveTo(cx, cy - r); cubicTo(cx + r * 0.7f, cy - r * 0.4f, cx + r * 0.7f, cy + r * 0.4f, cx, cy + r)
+    }, Color.White, style = stroke)
+    drawLine(Color.White.copy(alpha = 0.55f), Offset(cx - r, cy), Offset(cx + r, cy), strokeWidth = 1.8f, cap = StrokeCap.Round)
+    drawLine(Color.White.copy(alpha = 0.35f), Offset(cx - r * 0.8f, cy - r * 0.5f), Offset(cx + r * 0.8f, cy - r * 0.5f), strokeWidth = 1.5f, cap = StrokeCap.Round)
+    drawLine(Color.White.copy(alpha = 0.35f), Offset(cx - r * 0.8f, cy + r * 0.5f), Offset(cx + r * 0.8f, cy + r * 0.5f), strokeWidth = 1.5f, cap = StrokeCap.Round)
+}
+
+private fun DrawScope.drawMailIcon() {
+    val s = Stroke(width = 1.8f, cap = StrokeCap.Round)
+    drawRoundRect(TextHint, size = size, cornerRadius = androidx.compose.ui.geometry.CornerRadius(4f), style = s)
+    drawPath(Path().apply { moveTo(0f, 0f); lineTo(size.width / 2, size.height * 0.6f); lineTo(size.width, 0f) }, TextHint, style = s)
+}
+
+private fun DrawScope.drawLockIcon() {
+    val w = size.width; val h = size.height
+    drawRoundRect(TextHint, topLeft = Offset(0f, h * 0.43f), size = androidx.compose.ui.geometry.Size(w, h * 0.53f),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(6f), style = Stroke(1.8f))
+    drawPath(Path().apply {
+        moveTo(w * 0.25f, h * 0.43f); lineTo(w * 0.25f, h * 0.32f)
+        cubicTo(w * 0.25f, h * 0.12f, w * 0.75f, h * 0.12f, w * 0.75f, h * 0.32f); lineTo(w * 0.75f, h * 0.43f)
+    }, TextHint, style = Stroke(1.8f, cap = StrokeCap.Round))
+    drawCircle(TextHint, radius = w * 0.14f, center = Offset(w / 2, h * 0.69f))
+}
+
+private fun DrawScope.drawEyeIcon(visible: Boolean) {
+    val color = if (visible) TealStart else TextHint
+    val s = Stroke(1.8f, cap = StrokeCap.Round)
+    val cx = size.width / 2; val cy = size.height / 2
+    drawPath(Path().apply {
+        moveTo(size.width * 0.075f, cy)
+        cubicTo(size.width * 0.35f, cy - size.height * 0.3f, size.width * 0.65f, cy - size.height * 0.3f, size.width * 0.925f, cy)
+        cubicTo(size.width * 0.65f, cy + size.height * 0.3f, size.width * 0.35f, cy + size.height * 0.3f, size.width * 0.075f, cy)
+    }, color, style = s)
+    drawCircle(color, radius = size.minDimension * 0.12f, center = Offset(cx, cy), style = s)
+    if (!visible) drawLine(TextHint, Offset(size.width * 0.125f, size.height * 0.125f),
+        Offset(size.width * 0.875f, size.height * 0.875f), strokeWidth = 1.8f, cap = StrokeCap.Round)
+}
+
+private fun DrawScope.drawSupportIcon() {
+    val s = Stroke(1.8f, cap = StrokeCap.Round, join = StrokeJoin.Round)
+    drawPath(Path().apply {
+        moveTo(size.width / 2, size.height * 0.063f)
+        cubicTo(size.width * 0.26f, size.height * 0.063f, size.height * 0.063f, size.width / 2,
+            size.height * 0.063f, size.width / 2)
+        lineTo(size.height * 0.063f, size.width * 0.6f)
+        cubicTo(size.width * 0.32f, size.height * 0.78f, size.width * 0.41f, size.height * 0.95f, size.width / 2, size.height * 0.95f)
+        cubicTo(size.width * 0.74f, size.height * 0.95f, size.width * 0.94f, size.height * 0.75f, size.width * 0.94f, size.width * 0.51f)
+        cubicTo(size.width * 0.94f, size.width * 0.27f, size.width * 0.74f, size.height * 0.063f, size.width / 2, size.height * 0.063f)
+    }, TealStart, style = s)
+    drawLine(TealStart, Offset(size.width * 0.31f, size.height * 0.47f), Offset(size.width * 0.53f, size.height * 0.47f), 1.8f, cap = StrokeCap.Round)
+    drawLine(TealStart, Offset(size.width * 0.31f, size.height * 0.66f), Offset(size.width * 0.69f, size.height * 0.66f), 1.8f, cap = StrokeCap.Round)
+}
+
+private fun DrawScope.drawCardIcon() {
+    val color = Color(0xFFF5A620)
+    val s = Stroke(1.8f)
+    drawRoundRect(color, topLeft = Offset(size.width * 0.094f, size.height * 0.25f),
+        size = androidx.compose.ui.geometry.Size(size.width * 0.812f, size.height * 0.53f),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(5f), style = s)
+    drawLine(color, Offset(size.width * 0.094f, size.height * 0.44f), Offset(size.width * 0.906f, size.height * 0.44f), 1.8f)
+    drawLine(color, Offset(size.width * 0.28f, size.height * 0.66f), Offset(size.width * 0.47f, size.height * 0.66f), 2f, cap = StrokeCap.Round)
+}
+
+private fun DrawScope.drawPersonIcon() {
+    val color = Color(0xFF6C7FD8)
+    val s = Stroke(1.8f, cap = StrokeCap.Round)
+    drawCircle(color, radius = size.minDimension * 0.175f, center = Offset(size.width / 2, size.height * 0.375f), style = s)
+    drawPath(Path().apply {
+        moveTo(size.width * 0.156f, size.height * 0.9375f)
+        cubicTo(size.width * 0.156f, size.width * 0.765f, size.width * 0.31f, size.height * 0.625f,
+            size.width / 2, size.height * 0.625f)
+        cubicTo(size.width * 0.69f, size.height * 0.625f, size.width * 0.844f, size.width * 0.765f,
+            size.width * 0.844f, size.height * 0.9375f)
+    }, color, style = s)
+}
+
+private fun DrawScope.drawLockMenuIcon() {
+    val color = Color(0xFF8B68E8)
+    val s = Stroke(1.8f, cap = StrokeCap.Round)
+    drawRoundRect(color, topLeft = Offset(size.width * 0.172f, size.height * 0.484f),
+        size = androidx.compose.ui.geometry.Size(size.width * 0.656f, size.height * 0.469f),
+        cornerRadius = androidx.compose.ui.geometry.CornerRadius(5f), style = s)
+    drawPath(Path().apply {
+        moveTo(size.width * 0.3125f, size.height * 0.484f); lineTo(size.width * 0.3125f, size.height * 0.344f)
+        cubicTo(size.width * 0.3125f, size.height * 0.24f, size.width * 0.5f, size.height * 0.156f,
+            size.width * 0.6875f, size.height * 0.344f); lineTo(size.width * 0.6875f, size.height * 0.484f)
+    }, color, style = s)
+    drawCircle(color, radius = size.minDimension * 0.075f, center = Offset(size.width / 2, size.height * 0.719f))
+}
+

@@ -4,7 +4,7 @@ object IranianAppList {
 
     /** Package names in the free tier — shown at top, no paywall. */
     val FREE_PACKAGES = setOf(
-        "com.samanpr.blujr",
+        "com.samanpr.blu",
         "com.android.chrome",
     )
 
@@ -13,7 +13,8 @@ object IranianAppList {
 
     val apps = listOf(
         // ─── Free ────────────────────────────────────────────────────────────
-        IranianApp("com.samanpr.blujr",                          "Blu Bank",       "بلوبانک"),
+        IranianApp("com.samanpr.blu",                            "Blu Bank",       "بلوبانک"),
+        IranianApp("com.samanpr.blujr",                          "Blu Bank Junior", "جونیور بلوبانک"),
         IranianApp("com.android.chrome",                         "Google Chrome",  "گوگل کروم"),
 
         // ─── Banks ───────────────────────────────────────────────────────────

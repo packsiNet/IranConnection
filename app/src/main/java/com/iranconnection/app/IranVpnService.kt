@@ -7,13 +7,14 @@ import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.ServiceCompat
 import com.iranconnection.app.data.ConnectionLog
-import com.iranconnection.app.data.IranianAppList
 import com.iranconnection.app.data.WireGuardManager
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
+import kotlinx.coroutines.sync.Mutex
+import kotlinx.coroutines.sync.withLock
 
 class IranVpnService : GoBackend.VpnService() {
 
@@ -27,6 +28,11 @@ class IranVpnService : GoBackend.VpnService() {
     }
 
     private val scope = CoroutineScope(Dispatchers.IO)
+
+    // Serializes backend.setState calls. Without this, cancelling a slow connect races the
+    // still in-flight UP call against the cancel's DOWN call — whichever finishes last wins,
+    // which can leave the tunnel up (or isRunning wrong) even though the user asked to stop.
+    private val stateMutex = Mutex()
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         super.onStartCommand(intent, flags, startId)
@@ -52,16 +58,12 @@ class IranVpnService : GoBackend.VpnService() {
 
         scope.launch {
             try {
-                val prefs = getSharedPreferences("wireguard", Context.MODE_PRIVATE)
-                val enabledPkgs = IranianAppList.apps
-                    .filter { app -> prefs.getBoolean("app_enabled_${app.packageName}", true) }
-                    .flatMap { app ->
-                        // Chrome exists under two package names on some devices
-                        if (app.packageName == "com.android.chrome")
-                            listOf("com.android.chrome", "com.google.android.apps.chrome")
-                        else listOf(app.packageName)
-                    }
-                    .distinct()
+                val prefs = getSharedPreferences("enabled_apps", Context.MODE_PRIVATE)
+                val enabledPkgs = prefs.getString("enabled_apps", "")
+                    .orEmpty()
+                    .split(",")
+                    .map { it.trim() }
+                    .filter { it.isNotEmpty() }
                 ConnectionLog.add("enabled apps (${enabledPkgs.size})")
 
                 val installedApps = enabledPkgs.filter { pkg ->
@@ -98,30 +100,39 @@ class IranVpnService : GoBackend.VpnService() {
                 }
                 WireGuardManager.activeTunnel = tunnel
                 ConnectionLog.add("Calling backend.setState(UP)...")
-                backend.setState(tunnel, Tunnel.State.UP, config)
+                stateMutex.withLock {
+                    backend.setState(tunnel, Tunnel.State.UP, config)
+                    isRunning = true
+                }
                 ConnectionLog.add("backend.setState returned — isRunning = true")
-                isRunning = true
             } catch (e: Exception) {
                 ConnectionLog.add("EXCEPTION in startVpn: ${e::class.simpleName}: ${e.message}")
                 e.cause?.let { ConnectionLog.add("  caused by: ${it::class.simpleName}: ${it.message}") }
-                isRunning = false
                 stopVpn()
             }
         }
     }
 
     private fun stopVpn() {
-        scope.launch {
-            try {
-                val t = WireGuardManager.activeTunnel ?: return@launch
-                val b = WireGuardManager.getBackend(this@IranVpnService)
-                b.setState(t, Tunnel.State.DOWN, null)
-                WireGuardManager.activeTunnel = null
-            } catch (_: Exception) {}
-        }
-        isRunning = false
         ServiceCompat.stopForeground(this, ServiceCompat.STOP_FOREGROUND_REMOVE)
         stopSelf()
+        scope.launch {
+            try {
+                val t = WireGuardManager.activeTunnel
+                if (t != null) {
+                    val b = WireGuardManager.getBackend(this@IranVpnService)
+                    stateMutex.withLock {
+                        b.setState(t, Tunnel.State.DOWN, null)
+                        isRunning = false
+                    }
+                    WireGuardManager.activeTunnel = null
+                } else {
+                    isRunning = false
+                }
+            } catch (_: Exception) {
+                isRunning = false
+            }
+        }
     }
 
     override fun onRevoke() {

@@ -5,10 +5,70 @@
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
     <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
 
+    <!-- Android 11+ package visibility: only packages declared here are visible to
+         getInstalledApplications()/getPackageInfo(), so this must list every package
+         IranianAppList / allowed_packages can reference. -->
     <queries>
         <package android:name="com.samanpr.blu" />
-        <package android:name="ir.mobillet.app" />
+        <package android:name="com.samanpr.blujr" />
         <package android:name="com.android.chrome" />
+        <package android:name="ir.bmi.bam.nativeweb" />
+        <package android:name="com.saman.singlewindow" />
+        <package android:name="ir.mobillet.app" />
+        <package android:name="ir.tejaratbank.tata.mobile.android.tejarat" />
+        <package android:name="com.refahbank.dpi.android" />
+        <package android:name="com.isc.bsinew" />
+        <package android:name="com.ada.mbank.mehr" />
+        <package android:name="ir.omidbank" />
+        <package android:name="com.pmb.mobile" />
+        <package android:name="com.tosan.dara.postbank" />
+        <package android:name="digital.neobank" />
+        <package android:name="com.bki.mobilebanking.android" />
+        <package android:name="mob.banking.android.taavon" />
+        <package android:name="ir.izbank.omnichannel" />
+        <package android:name="mob.banking.android.resalat" />
+        <package android:name="co.redbank.app" />
+        <package android:name="com.tosan.dara.day" />
+        <package android:name="ir.stts.bjt" />
+        <package android:name="com.tosan.dara.sina" />
+        <package android:name="mob.banking.android.pasargad" />
+        <package android:name="com.tosan.dara.mehriran" />
+        <package android:name="ir.tes.sarmayeh" />
+        <package android:name="com.farazpardazan.enbank" />
+        <package android:name="mob.banking.android.gardesh" />
+        <package android:name="market.nobitex" />
+        <package android:name="com.emofid.rnmofid" />
+        <package android:name="com.mofidonline.mobile" />
+        <package android:name="ir.easytrader.orbis.m.twa" />
+        <package android:name="com.hamidrezabashiri.ezcard" />
+        <package android:name="com.mydigipay.app.android" />
+        <package android:name="co.nilin.faraznative" />
+        <package android:name="ir.hafhashtad.android780" />
+        <package android:name="com.dotin.wepod" />
+        <package android:name="ir.sep.sesoot" />
+        <package android:name="com.fam.fam" />
+        <package android:name="ir.mci.ecareapp" />
+        <package android:name="com.myirancell" />
+        <package android:name="ir.rightel.myrightel" />
+        <package android:name="com.digikala" />
+        <package android:name="ir.divar" />
+        <package android:name="com.sheypoor.mobile" />
+        <package android:name="ir.basalam.app" />
+        <package android:name="com.okala" />
+        <package android:name="ir.torob" />
+        <package android:name="com.farsitel.bazaar" />
+        <package android:name="com.nar.bimito" />
+        <package android:name="com.bimebazar.bimebazar" />
+        <package android:name="ir.eitaa.messenger" />
+        <package android:name="app.rbmain.a" />
+        <package android:name="mobi.mmdt.ottplus" />
+        <package android:name="com.citydi.hplus" />
+        <package android:name="com.parsmobapp" />
+        <package android:name="ir.ayantech.ghabzino" />
+        <package android:name="com.sibche.aspardproject.app" />
+        <package android:name="ir.zypod.app" />
+        <package android:name="app.sepino" />
+        <package android:name="com.melal" />
     </queries>
 
     <application
