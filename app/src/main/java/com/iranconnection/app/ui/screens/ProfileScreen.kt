@@ -54,6 +54,7 @@ fun ProfileScreen() {
     var key      by rememberSaveable { mutableStateOf("") }
     var keyVisible by rememberSaveable { mutableStateOf(false) }
     var currency by rememberSaveable { mutableStateOf("usd") }
+    var showPayment by rememberSaveable { mutableStateOf(false) }
 
     val doEnter = {
         if (email.isNotBlank()) {
@@ -86,8 +87,12 @@ fun ProfileScreen() {
                 email = email,
                 currency = currency,
                 onCurrencyChange = { currency = it },
+                onPay = { showPayment = true },
                 onExit = doExit,
             )
+            if (showPayment) {
+                PaymentScreen(currency = currency, onBack = { showPayment = false })
+            }
         }
     }
 }
@@ -233,6 +238,7 @@ private fun ProfileView(
     email: String,
     currency: String,
     onCurrencyChange: (String) -> Unit,
+    onPay: () -> Unit,
     onExit: () -> Unit,
 ) {
     // No embedded bottom nav here — the Profile tab reuses the same shared
@@ -256,7 +262,7 @@ private fun ProfileView(
         }
 
         // 3. Renew card
-        RenewCard(currency = currency, onCurrencyChange = onCurrencyChange)
+        RenewCard(currency = currency, onCurrencyChange = onCurrencyChange, onPay = onPay)
 
         // 4. Menu list
         MenuCard()
@@ -434,7 +440,7 @@ private fun StatCard(
 
 // ---- Renew card ----
 @Composable
-private fun RenewCard(currency: String, onCurrencyChange: (String) -> Unit) {
+private fun RenewCard(currency: String, onCurrencyChange: (String) -> Unit, onPay: () -> Unit) {
     val usd = currency == "usd"
     val invoiceTotal = if (usd) "$2.50" else "300,000 TMN"
     val payLabel     = if (usd) "Pay $2.50 →" else "Pay 300,000 TMN →"
@@ -514,7 +520,7 @@ private fun RenewCard(currency: String, onCurrencyChange: (String) -> Unit) {
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(9.dp))
                     .background(Color.White)
-                    .clickable {}
+                    .clickable { onPay() }
                     .padding(vertical = 10.dp),
                 contentAlignment = Alignment.Center
             ) {
