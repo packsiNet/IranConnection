@@ -179,10 +179,10 @@ fun NewTabScreen(onLoadUrl: (String) -> Unit) {
             "Divar" to "https://divar.ir",
             "Sheypoor" to "https://sheypoor.com",
             "Torob" to "https://torob.com",
-            "Gmail" to "https://mail.google.com",
-            "YouTube" to "https://youtube.com",
-            "Wikipedia" to "https://fa.wikipedia.org",
-            "Google" to "https://google.com",
+            "Aparat" to "https://aparat.com",
+            "Snapp" to "https://snapp.ir",
+            "Zoomit" to "https://zoomit.ir",
+            "Arzdigital" to "https://arzdigital.com",
         )
         // Manual 4-column grid (non-lazy) so it nests safely inside the scroll column.
         Column(

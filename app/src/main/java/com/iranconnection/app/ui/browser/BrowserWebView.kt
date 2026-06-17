@@ -4,6 +4,7 @@ import android.annotation.SuppressLint
 import android.graphics.Bitmap
 import android.webkit.WebChromeClient
 import android.webkit.WebResourceRequest
+import android.webkit.WebResourceResponse
 import android.webkit.WebSettings
 import android.webkit.WebView
 import android.webkit.WebViewClient
@@ -64,6 +65,10 @@ fun BrowserWebView(
                         onNavigationChanged(view.canGoBack(), view.canGoForward())
                     }
 
+                    // Called on the main thread before the WebView handles navigation.
+                    // We just track the URL here; the actual geo-IP check happens in
+                    // shouldInterceptRequest which runs on a background thread and can
+                    // do blocking DNS resolution safely.
                     override fun shouldOverrideUrlLoading(
                         view: WebView,
                         request: WebResourceRequest,
@@ -72,6 +77,32 @@ fun BrowserWebView(
                         lastRequestedUrl.value = target
                         view.loadUrl(target)
                         return true
+                    }
+
+                    // Called on a BACKGROUND thread for every resource request.
+                    // isForMainFrame limits geo-IP checks to page navigations only;
+                    // sub-resources (images, scripts) from CDNs are always allowed.
+                    override fun shouldInterceptRequest(
+                        view: WebView,
+                        request: WebResourceRequest,
+                    ): WebResourceResponse? {
+                        if (!request.isForMainFrame) return null
+
+                        val url = request.url.toString()
+                        if (url.startsWith("about:") || url.startsWith("data:") ||
+                            url.startsWith("blob:")) return null
+
+                        val host = request.url.host?.lowercase()?.removePrefix("www.")
+                            ?: return null
+
+                        return when (BrowserFilter.quickCheck(host)) {
+                            FilterDecision.ALLOWED -> null
+                            FilterDecision.BLOCKED -> BrowserFilter.blockedResponse(url)
+                            FilterDecision.NEEDS_IP_CHECK -> {
+                                if (IranianIpChecker.isIranianHost(host)) null
+                                else BrowserFilter.blockedResponse(url)
+                            }
+                        }
                     }
                 }
                 webChromeClient = object : WebChromeClient() {
@@ -92,6 +123,7 @@ fun BrowserWebView(
             // changed; this drives navigation after BrowserViewModel.loadUrl sets
             // the new URL, without reloading on every recomposition (progress ticks)
             // or fighting redirects reported via onPageStarted/onPageFinished.
+            // Geo-IP filtering is handled in shouldInterceptRequest, not here.
             if (isActive && tab.url.isNotEmpty() && tab.url != lastRequestedUrl.value) {
                 lastRequestedUrl.value = tab.url
                 webView.loadUrl(tab.url)
