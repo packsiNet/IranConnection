@@ -30,6 +30,7 @@ import androidx.compose.ui.focus.onFocusChanged
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.SolidColor
 import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.font.FontFamily
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.font.FontWeight
@@ -101,22 +102,26 @@ fun BrowserAddressBar(
                 modifier = Modifier
                     .weight(1f)
                     .height(40.dp)
-                    .background(Color(0xFFF1F3F4), RoundedCornerShape(20.dp))
-                    .padding(horizontal = 14.dp),
+                    .background(Color(0xFFF1F3F4), RoundedCornerShape(20.dp)),
                 contentAlignment = Alignment.CenterStart,
             ) {
                 if (!isFocused && textFieldValue.isEmpty()) {
                     Text(
-                        "جستجو یا آدرس وب",
+                        "sreach or add address",
                         fontSize = 13.sp,
                         color = Color(0xFF888888),
+                        modifier = Modifier.padding(horizontal = 16.dp),
                     )
                 }
                 BasicTextField(
                     value = textFieldValue,
                     onValueChange = { textFieldValue = it },
                     singleLine = true,
-                    textStyle = TextStyle(fontSize = 13.sp, color = Color(0xFF1A1A1A)),
+                    textStyle = TextStyle(
+                        fontSize = 13.sp,
+                        color = Color(0xFF1A1A1A),
+                        fontFamily = FontFamily.Default,
+                    ),
                     cursorBrush = SolidColor(Color(0xFF1A73E8)),
                     keyboardOptions = KeyboardOptions(
                         imeAction = ImeAction.Go,
@@ -125,6 +130,16 @@ fun BrowserAddressBar(
                     keyboardActions = KeyboardActions(
                         onGo = { onLoadUrl(textFieldValue) },
                     ),
+                    decorationBox = { innerTextField ->
+                        Box(
+                            modifier = Modifier
+                                .fillMaxWidth()
+                                .padding(horizontal = 16.dp),
+                            contentAlignment = Alignment.CenterStart,
+                        ) {
+                            innerTextField()
+                        }
+                    },
                     modifier = Modifier
                         .fillMaxWidth()
                         .onFocusChanged { isFocused = it.isFocused },

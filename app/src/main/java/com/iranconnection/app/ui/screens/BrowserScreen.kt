@@ -17,6 +17,7 @@ import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.border
+import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
@@ -57,9 +58,8 @@ fun BrowserScreen(viewModel: BrowserViewModel = viewModel()) {
         viewModel.toggleTabGrid()
     }
 
-    Box(modifier = Modifier.fillMaxSize()) {
-        Column(modifier = Modifier.fillMaxSize()) {
-            // Address bar pinned at the top.
+    Scaffold(
+        topBar = {
             BrowserAddressBar(
                 url = state.addressBarText,
                 tabCount = state.tabCount,
@@ -75,54 +75,55 @@ fun BrowserScreen(viewModel: BrowserViewModel = viewModel()) {
                 onShowTabs = { viewModel.toggleTabGrid() },
                 onNewTab = { viewModel.addTab() },
             )
-
-            Box(modifier = Modifier.weight(1f)) {
-                // WebView stack — all tabs stay alive, but the active tab is always
-                // drawn LAST so it sits on top and receives touches. Inactive tabs
-                // are hidden (alpha 0) and live underneath, so they can't intercept
-                // input meant for the active tab.
-                state.tabs.forEachIndexed { index, tab ->
-                    if (index != state.activeTabIndex) {
-                        key(tab.id) {
-                            TabWebView(
-                                tab = tab,
-                                isActive = false,
-                                viewModel = viewModel,
-                                webViewRefs = webViewRefs,
-                                modifier = Modifier.fillMaxSize().alpha(0f),
-                            )
-                        }
-                    }
-                }
-                state.tabs.getOrNull(state.activeTabIndex)?.let { tab ->
+        },
+        containerColor = Color.Transparent,
+    ) { innerPadding ->
+        Box(modifier = Modifier.fillMaxSize().padding(innerPadding)) {
+            // WebView stack — all tabs stay alive, but the active tab is always
+            // drawn LAST so it sits on top and receives touches. Inactive tabs
+            // are hidden (alpha 0) and live underneath, so they can't intercept
+            // input meant for the active tab.
+            state.tabs.forEachIndexed { index, tab ->
+                if (index != state.activeTabIndex) {
                     key(tab.id) {
                         TabWebView(
                             tab = tab,
-                            isActive = true,
+                            isActive = false,
                             viewModel = viewModel,
                             webViewRefs = webViewRefs,
-                            modifier = Modifier.fillMaxSize(),
+                            modifier = Modifier.fillMaxSize().alpha(0f),
                         )
                     }
                 }
-
-                // New-tab landing page on top of the (empty) active WebView.
-                if (state.activeTab.url.isEmpty()) {
-                    NewTabScreen(onLoadUrl = { viewModel.loadUrl(it) })
+            }
+            state.tabs.getOrNull(state.activeTabIndex)?.let { tab ->
+                key(tab.id) {
+                    TabWebView(
+                        tab = tab,
+                        isActive = true,
+                        viewModel = viewModel,
+                        webViewRefs = webViewRefs,
+                        modifier = Modifier.fillMaxSize(),
+                    )
                 }
             }
-        }
 
-        // Tab grid overlay.
-        if (state.showTabGrid) {
-            TabGridScreen(
-                tabs = state.tabs,
-                activeTabIndex = state.activeTabIndex,
-                onSelectTab = { viewModel.selectTab(it) },
-                onCloseTab = { viewModel.closeTab(it) },
-                onAddTab = { viewModel.addTab() },
-                onDismiss = { viewModel.toggleTabGrid() },
-            )
+            // New-tab landing page on top of the (empty) active WebView.
+            if (state.activeTab.url.isEmpty()) {
+                NewTabScreen(onLoadUrl = { viewModel.loadUrl(it) })
+            }
+
+            // Tab grid overlay.
+            if (state.showTabGrid) {
+                TabGridScreen(
+                    tabs = state.tabs,
+                    activeTabIndex = state.activeTabIndex,
+                    onSelectTab = { viewModel.selectTab(it) },
+                    onCloseTab = { viewModel.closeTab(it) },
+                    onAddTab = { viewModel.addTab() },
+                    onDismiss = { viewModel.toggleTabGrid() },
+                )
+            }
         }
     }
 }
