@@ -19,6 +19,7 @@ import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -33,11 +34,14 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.iranconnection.app.data.ConfigFetcher
+import com.iranconnection.app.data.UpdateInfo
+import com.iranconnection.app.data.UpdateManager
 import com.iranconnection.app.data.VpnStatus
 import com.iranconnection.app.data.VpnViewModel
 import com.iranconnection.app.data.WireGuardConfig
 import com.iranconnection.app.ui.components.AppBottomNav
 import com.iranconnection.app.ui.components.NavTab
+import com.iranconnection.app.ui.components.UpdateDialog
 import com.iranconnection.app.ui.screens.AppsScreen
 import com.iranconnection.app.ui.screens.BrowserScreen
 import com.iranconnection.app.ui.screens.HomeScreen
@@ -86,8 +90,9 @@ class MainActivity : ComponentActivity() {
             putString("client_priv_key", config.clientPrivateKey)
             putString("address", config.clientAddress)
             putString("dns", config.dns)
-            if (!config.iranianApps.isNullOrEmpty()) {
-                putString("iranian_apps", config.iranianApps.joinToString(","))
+            val iranianApps = config.iranianApps
+            if (iranianApps != null && iranianApps.isNotEmpty()) {
+                putString("iranian_apps", iranianApps.joinToString(","))
             }
             apply()
         }
@@ -99,6 +104,27 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
     val state by vm.state.collectAsState()
     var tab by remember { mutableStateOf(NavTab.HOME) }
     val context = LocalContext.current
+
+    var updateInfo by remember { mutableStateOf<UpdateInfo>(UpdateInfo.UpToDate) }
+    var showUpdateDialog by remember { mutableStateOf(false) }
+    LaunchedEffect(Unit) {
+        val currentVersion = context.packageManager
+            .getPackageInfo(context.packageName, 0).versionName ?: "1.0"
+        val result = UpdateManager.checkForUpdate(currentVersion)
+        if (result is UpdateInfo.UpdateAvailable) {
+            updateInfo = result
+            showUpdateDialog = true
+        }
+    }
+
+    if (showUpdateDialog && updateInfo is UpdateInfo.UpdateAvailable) {
+        val info = updateInfo as UpdateInfo.UpdateAvailable
+        UpdateDialog(
+            newVersion = info.newVersion,
+            downloadUrl = info.downloadUrl,
+            onDismiss = { showUpdateDialog = false },
+        )
+    }
 
     val vpnPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()

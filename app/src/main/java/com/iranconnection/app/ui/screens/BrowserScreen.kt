@@ -168,21 +168,21 @@ fun NewTabScreen(onLoadUrl: (String) -> Unit) {
 
         Box(modifier = Modifier.height(28.dp))
         Text(
-            text = "سایت‌های پرکاربرد",
+            text = "Popular Sites",
             fontSize = 13.sp,
             color = Color(0xFF888888),
         )
         Box(modifier = Modifier.height(12.dp))
 
         val quickLinks = listOf(
-            "دیجی‌کالا" to "https://digikala.com",
-            "دیوار" to "https://divar.ir",
-            "شیپور" to "https://sheypoor.com",
-            "ترب" to "https://torob.com",
-            "ایمیل" to "https://mail.google.com",
-            "یوتیوب" to "https://youtube.com",
-            "ویکی‌پدیا" to "https://fa.wikipedia.org",
-            "گوگل" to "https://google.com",
+            "Digikala" to "https://digikala.com",
+            "Divar" to "https://divar.ir",
+            "Sheypoor" to "https://sheypoor.com",
+            "Torob" to "https://torob.com",
+            "Gmail" to "https://mail.google.com",
+            "YouTube" to "https://youtube.com",
+            "Wikipedia" to "https://fa.wikipedia.org",
+            "Google" to "https://google.com",
         )
         // Manual 4-column grid (non-lazy) so it nests safely inside the scroll column.
         Column(
@@ -262,7 +262,7 @@ private fun IntroCard() {
             Column {
                 Text("IranConnection",
                     fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                Text("مرورگر امن داخل اپ",
+                Text("Secure In-App Browser",
                     fontSize = 10.5.sp, color = Color.White.copy(alpha = 0.6f),
                     modifier = Modifier.padding(top = 1.dp))
             }
@@ -271,8 +271,8 @@ private fun IntroCard() {
         Box(modifier = Modifier.height(12.dp))
 
         Text(
-            text = "دسترسی امن و آزاد به اینترنت برای همه‌ی کاربران خارج از ایران. " +
-                "سریع، امن و بدون محدودیت — راهکاری مطمئن برای اتصال به دنیا، هر کجا که باشید.",
+            text = "Free and secure internet access for Iranians abroad. " +
+                "Fast, safe, and unrestricted — your trusted connection to the world, wherever you are.",
             fontSize = 12.sp,
             lineHeight = 19.sp,
             color = Color.White.copy(alpha = 0.92f),
@@ -281,7 +281,7 @@ private fun IntroCard() {
         Box(modifier = Modifier.height(12.dp))
 
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-            listOf("بدون محدودیت", "امن", "سریع").forEach { chip ->
+            listOf("No Limits", "Secure", "Fast").forEach { chip ->
                 Box(
                     modifier = Modifier
                         .clip(RoundedCornerShape(20.dp))

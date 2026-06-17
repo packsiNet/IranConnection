@@ -107,7 +107,7 @@ fun BrowserAddressBar(
             ) {
                 if (!isFocused && textFieldValue.isEmpty()) {
                     Text(
-                        "sreach or add address",
+                        "Search or enter address",
                         fontSize = 13.sp,
                         color = Color(0xFF888888),
                         modifier = Modifier.padding(horizontal = 16.dp),
