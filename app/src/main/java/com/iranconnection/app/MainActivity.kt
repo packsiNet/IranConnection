@@ -34,6 +34,7 @@ import androidx.compose.ui.unit.sp
 import androidx.lifecycle.lifecycleScope
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.iranconnection.app.data.ConfigFetcher
+import com.iranconnection.app.data.auth.ApiClient
 import com.iranconnection.app.data.UpdateInfo
 import com.iranconnection.app.data.UpdateManager
 import com.iranconnection.app.data.VpnStatus
@@ -65,6 +66,9 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
+
+        // Build the HTTP/auth layer once before any screen/ViewModel uses it.
+        ApiClient.init(applicationContext)
 
         lifecycleScope.launch {
             val config = ConfigFetcher.fetch(CONFIG_URL)

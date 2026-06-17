@@ -25,6 +25,9 @@ import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.VisualTransformation
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.iranconnection.app.data.auth.AuthViewModel
+import com.iranconnection.app.data.auth.UserProfile
 
 // ---- Color palette (Profile-screen specific) ----
 private val TealStart   = Color(0xFF3DBFBA)
@@ -45,26 +48,16 @@ private val Red         = Color(0xFFEF4444)
 
 // ---- Main screen ----
 @Composable
-fun ProfileScreen() {
-    val context = LocalContext.current
-    val prefs = remember { context.getSharedPreferences("ic_auth", android.content.Context.MODE_PRIVATE) }
+fun ProfileScreen(vm: AuthViewModel = viewModel()) {
+    val state by vm.state.collectAsState()
 
-    var loggedIn by rememberSaveable { mutableStateOf(prefs.getString("ic_auth", null) == "1") }
-    var email    by rememberSaveable { mutableStateOf(prefs.getString("ic_email", "") ?: "") }
-    var key      by rememberSaveable { mutableStateOf("") }
-    var keyVisible by rememberSaveable { mutableStateOf(false) }
+    var showRegister by rememberSaveable { mutableStateOf(false) }
     var currency by rememberSaveable { mutableStateOf("usd") }
     var showPayment by rememberSaveable { mutableStateOf(false) }
 
-    val doEnter = {
-        if (email.isNotBlank()) {
-            prefs.edit().putString("ic_auth", "1").putString("ic_email", email).apply()
-            loggedIn = true
-        }
-    }
-    val doExit = {
-        prefs.edit().remove("ic_auth").remove("ic_email").apply()
-        loggedIn = false; email = ""; key = ""; keyVisible = false
+    // Pull fresh profile whenever we transition into the logged-in state.
+    LaunchedEffect(state.isLoggedIn) {
+        if (state.isLoggedIn) vm.loadProfile()
     }
 
     Box(
@@ -72,23 +65,21 @@ fun ProfileScreen() {
             .fillMaxSize()
             .background(BgScreen)
     ) {
-        if (!loggedIn) {
-            AccessView(
-                email = email,
-                onEmailChange = { email = it },
-                accessKey = key,
-                onKeyChange = { key = it },
-                keyVisible = keyVisible,
-                onToggleVis = { keyVisible = !keyVisible },
-                onEnter = doEnter,
-            )
+        if (!state.isLoggedIn) {
+            if (showRegister) {
+                RegisterScreen(vm = vm, onLoginClick = { showRegister = false })
+            } else {
+                LoginScreen(vm = vm, onRegisterClick = { showRegister = true })
+            }
         } else {
             ProfileView(
-                email = email,
+                profile = state.profile,
+                email = state.email,
+                fullName = state.fullName,
                 currency = currency,
                 onCurrencyChange = { currency = it },
                 onPay = { showPayment = true },
-                onExit = doExit,
+                onExit = { vm.logout() },
             )
             if (showPayment) {
                 PaymentScreen(currency = currency, onBack = { showPayment = false })
@@ -97,145 +88,12 @@ fun ProfileScreen() {
     }
 }
 
-// ---- Access view (login) ----
-@Composable
-private fun AccessView(
-    email: String,
-    onEmailChange: (String) -> Unit,
-    accessKey: String,
-    onKeyChange: (String) -> Unit,
-    keyVisible: Boolean,
-    onToggleVis: () -> Unit,
-    onEnter: () -> Unit,
-) {
-    Column(
-        modifier = Modifier
-            .fillMaxSize()
-            .verticalScroll(rememberScrollState())
-    ) {
-        // Hero gradient card
-        Box(
-            modifier = Modifier
-                .padding(start = 12.dp, end = 12.dp, top = 10.dp)
-                .fillMaxWidth()
-                .shadow(elevation = 20.dp, shape = RoundedCornerShape(28.dp), spotColor = TealMid)
-                .clip(RoundedCornerShape(28.dp))
-                .background(
-                    Brush.linearGradient(
-                        colors = listOf(TealStart, TealMid, TealEnd),
-                        start = Offset(0f, 0f), end = Offset(600f, 600f)
-                    )
-                )
-                .padding(horizontal = 24.dp, vertical = 32.dp)
-        ) {
-            // Decorative rings
-            RingDecor(size = 130.dp, borderWidth = 26.dp, alpha = 0.06f,
-                modifier = Modifier.align(Alignment.TopEnd).offset(x = 28.dp, y = (-28).dp))
-            RingDecor(size = 96.dp, borderWidth = 20.dp, alpha = 0.05f,
-                modifier = Modifier.align(Alignment.BottomEnd).offset(x = (-30).dp, y = 44.dp))
-            RingDecor(size = 70.dp, borderWidth = 14.dp, alpha = 0.04f,
-                modifier = Modifier.align(Alignment.BottomStart).offset(x = (-18).dp, y = (-20).dp))
-
-            Column {
-                // Globe icon box
-                Box(
-                    modifier = Modifier
-                        .size(52.dp)
-                        .clip(RoundedCornerShape(17.dp))
-                        .background(Color.White.copy(alpha = 0.15f))
-                        .border(1.5.dp, Color.White.copy(alpha = 0.25f), RoundedCornerShape(17.dp)),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Canvas(modifier = Modifier.size(28.dp)) { drawGlobeIcon() }
-                }
-                Spacer(Modifier.height(18.dp))
-                Text("IranConnection",
-                    fontSize = 21.sp, fontWeight = FontWeight.ExtraBold, color = Color.White,
-                    letterSpacing = (-0.6).sp, lineHeight = 24.sp)
-                Spacer(Modifier.height(5.dp))
-                Text("Secure global access · IR",
-                    fontSize = 11.5.sp, color = Color.White.copy(alpha = 0.55f), fontWeight = FontWeight.Normal)
-            }
-        }
-
-        // Form section
-        Column(
-            modifier = Modifier.padding(horizontal = 14.dp, vertical = 20.dp),
-            verticalArrangement = Arrangement.spacedBy(9.dp)
-        ) {
-            Text("Welcome back",
-                fontSize = 15.sp, fontWeight = FontWeight.Bold, color = TextPrimary,
-                letterSpacing = (-0.3).sp, modifier = Modifier.padding(bottom = 3.dp))
-
-            // Email field
-            AuthField(
-                value = email,
-                onValueChange = onEmailChange,
-                placeholder = "Email address",
-                keyboardType = KeyboardType.Email,
-                leadingIcon = { Canvas(Modifier.size(15.dp, 12.dp)) { drawMailIcon() } }
-            )
-
-            // Access key field
-            AuthField(
-                value = accessKey,
-                onValueChange = onKeyChange,
-                placeholder = "Access key",
-                keyboardType = KeyboardType.Password,
-                visualTransformation = if (keyVisible) VisualTransformation.None else PasswordVisualTransformation(),
-                leadingIcon = { Canvas(Modifier.size(14.dp, 17.dp)) { drawLockIcon() } },
-                trailingIcon = {
-                    IconButton(onClick = onToggleVis, modifier = Modifier.size(32.dp)) {
-                        Canvas(Modifier.size(16.dp)) { drawEyeIcon(keyVisible) }
-                    }
-                }
-            )
-
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.End) {
-                Text("Forgot password?",
-                    fontSize = 11.5.sp, color = TealStart, fontWeight = FontWeight.SemiBold)
-            }
-
-            // Access button
-            Button(
-                onClick = onEnter,
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .height(46.dp)
-                    .shadow(12.dp, RoundedCornerShape(13.dp), spotColor = TealMid),
-                shape = RoundedCornerShape(13.dp),
-                colors = ButtonDefaults.buttonColors(containerColor = Color.Transparent),
-                contentPadding = PaddingValues(0.dp)
-            ) {
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize()
-                        .background(
-                            Brush.linearGradient(listOf(Color(0xFF4ECAC5), TealMid)),
-                            RoundedCornerShape(13.dp)
-                        ),
-                    contentAlignment = Alignment.Center
-                ) {
-                    Text("Sign In",
-                        fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
-            }
-
-            Row(
-                modifier = Modifier.fillMaxWidth().padding(top = 2.dp),
-                horizontalArrangement = Arrangement.Center
-            ) {
-                Text("New here? ", fontSize = 11.5.sp, color = TextMuted)
-                Text("Create account", fontSize = 11.5.sp, color = TealStart, fontWeight = FontWeight.Bold)
-            }
-        }
-    }
-}
-
 // ---- Profile view (logged in) ----
 @Composable
 private fun ProfileView(
+    profile: UserProfile?,
     email: String,
+    fullName: String,
     currency: String,
     onCurrencyChange: (String) -> Unit,
     onPay: () -> Unit,
@@ -251,7 +109,11 @@ private fun ProfileView(
         verticalArrangement = Arrangement.spacedBy(9.dp)
     ) {
         // 1. Profile hero card
-        ProfileHeroCard(email = email)
+        ProfileHeroCard(
+            profile = profile,
+            email = email,
+            fullName = fullName,
+        )
 
         // 2. Mini stats row
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -284,12 +146,23 @@ private fun ProfileView(
 
 // ---- Profile hero card ----
 @Composable
-private fun ProfileHeroCard(email: String) {
+private fun ProfileHeroCard(profile: UserProfile?, email: String, fullName: String) {
     val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
         initialValue = 1f, targetValue = 0.4f,
         animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "pulseAlpha"
     )
+
+    val sub = profile?.subscription
+    val displayName = fullName.ifBlank { profile?.fullName ?: "" }.ifBlank { "—" }
+    val displayEmail = email.ifBlank { profile?.email ?: "" }
+    val planLabel = sub?.plan?.ifBlank { null } ?: "Free"
+    val avatarLetter = displayName.firstOrNull()?.uppercaseChar()?.toString()
+        ?: displayEmail.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
+    val activeUntil = sub?.expireDate?.substringBefore('T')?.ifBlank { null } ?: "—"
+    val daysRemaining = sub?.daysRemaining
+    val remainingLabel = daysRemaining?.let { "$it days" } ?: "—"
+    val progress = daysRemaining?.let { (it / 30f).coerceIn(0f, 1f) } ?: 0f
 
     Box(
         modifier = Modifier
@@ -319,20 +192,20 @@ private fun ProfileHeroCard(email: String) {
                         .border(2.dp, Color.White.copy(alpha = 0.3f), CircleShape),
                     contentAlignment = Alignment.Center
                 ) {
-                    Text("A", fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                    Text(avatarLetter, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
                 }
 
                 Column(modifier = Modifier.weight(1f)) {
-                    Text("Ali Mohammadi",
+                    Text(displayName,
                         fontSize = 13.5.sp, fontWeight = FontWeight.Bold, color = Color.White,
                         letterSpacing = (-0.2).sp)
-                    Text(email.ifBlank { "ali@example.com" },
+                    Text(displayEmail,
                         fontSize = 10.5.sp, color = Color.White.copy(alpha = 0.55f),
                         maxLines = 1, overflow = TextOverflow.Ellipsis,
                         modifier = Modifier.padding(top = 2.dp))
                 }
 
-                // Premium badge
+                // Plan badge
                 Row(
                     modifier = Modifier
                         .clip(RoundedCornerShape(18.dp))
@@ -346,7 +219,7 @@ private fun ProfileHeroCard(email: String) {
                         .size(5.dp)
                         .clip(CircleShape)
                         .background(Amber.copy(alpha = pulse)))
-                    Text("Premium", fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
+                    Text(planLabel, fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = Color.White)
                 }
             }
 
@@ -365,14 +238,14 @@ private fun ProfileHeroCard(email: String) {
                     Text("ACTIVE UNTIL",
                         fontSize = 9.5.sp, color = Color.White.copy(alpha = 0.5f), letterSpacing = 0.9.sp)
                     Spacer(Modifier.height(2.dp))
-                    Text("Jul 12, 2026",
+                    Text(activeUntil,
                         fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White, letterSpacing = (-0.2).sp)
                 }
                 Column(horizontalAlignment = Alignment.End) {
                     Text("REMAINING",
                         fontSize = 9.5.sp, color = Color.White.copy(alpha = 0.5f), letterSpacing = 0.9.sp)
                     Spacer(Modifier.height(2.dp))
-                    Text("28 days",
+                    Text(remainingLabel,
                         fontSize = 14.sp, fontWeight = FontWeight.Bold, color = Color.White)
                 }
             }
@@ -387,7 +260,7 @@ private fun ProfileHeroCard(email: String) {
                     .background(Color.White.copy(alpha = 0.18f))
             ) {
                 Box(modifier = Modifier
-                    .fillMaxWidth(0.93f)
+                    .fillMaxWidth(progress)
                     .fillMaxHeight()
                     .clip(RoundedCornerShape(3.dp))
                     .background(Color.White.copy(alpha = 0.78f)))

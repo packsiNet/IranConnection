@@ -16,6 +16,10 @@ android {
         versionCode = 1
         versionName = "1.0.0"
         vectorDrawables { useSupportLibrary = true }
+
+        // Backend API base URL. Emulator reaches the host machine via 10.0.2.2
+        // (not "localhost"). Override per build type / on a real device as needed.
+        buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:5297\"")
     }
 
     buildTypes {
@@ -32,7 +36,10 @@ android {
         targetCompatibility = JavaVersion.VERSION_17
     }
     kotlinOptions { jvmTarget = "17" }
-    buildFeatures { compose = true }
+    buildFeatures {
+        compose = true
+        buildConfig = true
+    }
 }
 
 dependencies {
