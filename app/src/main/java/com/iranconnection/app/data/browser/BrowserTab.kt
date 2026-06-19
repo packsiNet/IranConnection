@@ -7,7 +7,7 @@ import java.util.UUID
 data class BrowserTab(
     val id: String = UUID.randomUUID().toString(),
     val url: String = "",
-    val title: String = "صفحه جدید",
+    val title: String = "New tab",
     val favicon: Bitmap? = null,
     val isLoading: Boolean = false,
     val progress: Int = 0,

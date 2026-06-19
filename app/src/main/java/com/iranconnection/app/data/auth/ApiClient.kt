@@ -3,6 +3,8 @@ package com.iranconnection.app.data.auth
 import android.content.Context
 import com.google.gson.Gson
 import com.iranconnection.app.BuildConfig
+import com.iranconnection.app.data.payment.PaymentApi
+import com.iranconnection.app.data.subscription.SubscriptionApi
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory
@@ -13,6 +15,10 @@ object ApiClient {
     lateinit var authApi: AuthApi
         private set
     lateinit var userApi: UserApi
+        private set
+    lateinit var subscriptionApi: SubscriptionApi
+        private set
+    lateinit var paymentApi: PaymentApi
         private set
 
     val gson: Gson = Gson()
@@ -50,5 +56,7 @@ object ApiClient {
 
         authApi = retrofit.create(AuthApi::class.java)
         userApi = retrofit.create(UserApi::class.java)
+        subscriptionApi = retrofit.create(SubscriptionApi::class.java)
+        paymentApi = retrofit.create(PaymentApi::class.java)
     }
 }

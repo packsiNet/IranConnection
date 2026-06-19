@@ -25,6 +25,30 @@ object AuthRepository {
     suspend fun profile(): Result<UserProfile> =
         call { ApiClient.userApi.profile() }
 
+    suspend fun verifyEmail(email: String, code: String): Result<String> =
+        call { ApiClient.authApi.verifyEmail(VerifyEmailRequest(email.trim(), code)) }
+
+    suspend fun resendVerification(): Result<String> =
+        call { ApiClient.userApi.resendVerification() }
+
+    suspend fun forgotPassword(email: String): Result<String> =
+        call { ApiClient.authApi.forgotPassword(ForgotPasswordRequest(email.trim())) }
+
+    suspend fun resetPassword(email: String, code: String, newPassword: String): Result<String> =
+        call { ApiClient.authApi.resetPassword(ResetPasswordRequest(email.trim(), code, newPassword)) }
+
+    /** On success the profile/auth identity should be refreshed from the returned object. */
+    suspend fun updateProfile(fullName: String?, currentPassword: String?, newPassword: String?): Result<UserProfile> =
+        call {
+            ApiClient.userApi.updateProfile(
+                UpdateProfileRequest(
+                    fullName = fullName?.ifBlank { null },
+                    currentPassword = currentPassword?.ifBlank { null },
+                    newPassword = newPassword?.ifBlank { null },
+                )
+            )
+        }
+
     /** Best-effort server logout, then always clear local tokens. */
     suspend fun logout() {
         val refresh = TokenStore.refreshToken
@@ -59,7 +83,7 @@ object AuthRepository {
                     Result.failure(Exception(parseError(resp)))
                 }
             } catch (e: Exception) {
-                Result.failure(Exception("خطا در ارتباط با سرور"))
+                Result.failure(Exception("Error communicating with the server."))
             }
         }
 
@@ -74,12 +98,12 @@ object AuthRepository {
         if (!serverMsg.isNullOrBlank()) return serverMsg
 
         return when (resp.code()) {
-            400 -> "اطلاعات وارد شده معتبر نیست"
-            401 -> "ایمیل یا رمز عبور اشتباه است"
-            403 -> "حساب کاربری شما غیرفعال است"
-            404 -> "کاربر یافت نشد"
-            409 -> "این ایمیل قبلاً ثبت شده است"
-            else -> "خطای سرور (${resp.code()})"
+            400 -> "Invalid login"
+            401 -> "Incorrect email or password"
+            403 -> "Your account is disabled"
+            404 -> "User not found"
+            409 -> "This email address is already registered"
+            else -> "Server error (${resp.code()})"
         }
     }
 }

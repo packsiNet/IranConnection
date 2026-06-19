@@ -25,7 +25,7 @@ class BrowserViewModel : ViewModel() {
     // ---- Tab management ----
 
     fun addTab(url: String = "") {
-        val newTab = BrowserTab(url = url, title = "صفحه جدید")
+        val newTab = BrowserTab(url = url, title = "New tab")
         _state.update { s ->
             s.copy(
                 tabs = s.tabs + newTab,

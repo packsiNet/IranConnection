@@ -1,7 +1,6 @@
 package com.iranconnection.app.ui.screens
 
 import android.net.Uri
-import android.provider.OpenableColumns
 import androidx.activity.compose.BackHandler
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -16,6 +15,7 @@ import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.text.BasicTextField
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.Text
 import androidx.compose.runtime.*
 import androidx.compose.runtime.saveable.rememberSaveable
@@ -32,7 +32,6 @@ import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.StrokeJoin
 import androidx.compose.ui.graphics.drawscope.Stroke
 import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
@@ -40,8 +39,13 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.lifecycle.viewmodel.compose.viewModel
+import com.iranconnection.app.data.payment.PaymentViewModel
+import com.iranconnection.app.data.payment.PickedReceipt
+import com.iranconnection.app.data.payment.ReceiptResponse
+import kotlinx.coroutines.delay
 
-// ---- Bank card data per currency ----
+// ---- Bank card data per currency (destination card + amount live in the frontend, not the API) ----
 private data class BankCard(
     val bank: String,
     val number: String,
@@ -53,15 +57,14 @@ private data class BankCard(
 
 private fun bankCardFor(currency: String): BankCard =
     if (currency == "usd") BankCard(
-        bank = "Redotpay",
+        bank = "USD Bank",
         number = "4937 2420 2574 6817",
         holder = "LALEH MANSOURI",
-        // Crimson → maroon (زرشکی/قرمز)
         gradient = listOf(Color(0xFFE63950), Color(0xFFB01030), Color(0xFF7A0C24)),
         shadow = Color(0x5CC81838),
         amount = "$2.50 USD",
     ) else BankCard(
-        bank = "Blue Bank",
+        bank = "Iranian Bank",
         number = "6219 8618 0150 9695",
         holder = "SHAHRAM OVEISI",
         gradient = listOf(Color(0xFF2D8FD8), Color(0xFF1868B2), Color(0xFF0C3D78)),
@@ -69,35 +72,82 @@ private fun bankCardFor(currency: String): BankCard =
         amount = "300,000 TMN",
     )
 
+// ---- Duration presets (durationDays 1..365) ----
+private data class DurationOption(val days: Int, val label: String)
+private val DURATIONS = listOf(
+    DurationOption(30, "1 Month"),
+    DurationOption(90, "3 Months"),
+    DurationOption(365, "1 Year"),
+)
+
 // ---- Payment screen ----
 @Composable
-fun PaymentScreen(currency: String, onBack: () -> Unit) {
-    val context = LocalContext.current
+fun PaymentScreen(
+    currency: String,
+    onBack: () -> Unit,
+    onApproved: () -> Unit = {},
+    vm: PaymentViewModel = viewModel(),
+) {
     val clipboard = LocalClipboardManager.current
     val card = remember(currency) { bankCardFor(currency) }
+    val state by vm.state.collectAsState()
 
     var name by rememberSaveable { mutableStateOf("") }
     var last4 by rememberSaveable { mutableStateOf("") }
-    var receiptName by rememberSaveable { mutableStateOf<String?>(null) }
-    var submitted by rememberSaveable { mutableStateOf(false) }
+    var durationDays by rememberSaveable { mutableStateOf(30) }
+    var picked by remember { mutableStateOf<PickedReceipt?>(null) }
     var copied by remember { mutableStateOf(false) }
+    var showReceipts by rememberSaveable { mutableStateOf(false) }
+    var triedSubmit by rememberSaveable { mutableStateOf(false) }
 
     val picker = rememberLauncherForActivityResult(
         ActivityResultContracts.GetContent()
-    ) { uri: Uri? ->
-        if (uri != null) receiptName = queryDisplayName(context, uri) ?: "receipt"
-    }
+    ) { uri: Uri? -> if (uri != null) picked = vm.inspectFile(uri) }
 
     LaunchedEffect(copied) {
-        if (copied) {
-            kotlinx.coroutines.delay(2200)
-            copied = false
+        if (copied) { delay(2200); copied = false }
+    }
+
+    // On 201, jump to the receipts list so the user can track the status.
+    LaunchedEffect(state.successMessage) {
+        if (state.successMessage != null) showReceipts = true
+    }
+
+    // Load + light-poll receipts while the list is open.
+    LaunchedEffect(showReceipts) {
+        if (showReceipts) {
+            vm.loadReceipts()
+            while (true) { delay(6000); vm.loadReceipts() }
         }
     }
 
-    BackHandler(onBack = onBack)
+    // When a receipt flips to Approved, refresh the subscription so the new plan shows.
+    var approvedNotified by rememberSaveable { mutableStateOf(false) }
+    LaunchedEffect(state.receipts) {
+        val anyApproved = state.receipts.any { it.status.equals("Approved", ignoreCase = true) }
+        if (anyApproved && !approvedNotified) { approvedNotified = true; onApproved() }
+    }
 
-    val canSubmit = name.trim().length > 1 && last4.length == 4 && receiptName != null && !submitted
+    BackHandler(onBack = { if (showReceipts) showReceipts = false else onBack() })
+
+    if (showReceipts) {
+        ReceiptsView(
+            receipts = state.receipts,
+            loading = state.receiptsLoading,
+            error = state.receiptsError,
+            successMessage = state.successMessage,
+            onBack = { showReceipts = false },
+            onRefresh = vm::loadReceipts,
+        )
+        return
+    }
+
+    val fileErr = picked?.let { vm.validateFile(it) }
+    val nameValid = name.trim().isNotEmpty() && name.trim().length <= 200
+    val last4Valid = last4.length == 4
+    val fileValid = picked != null && fileErr == null
+    val canSubmit = nameValid && last4Valid && fileValid && durationDays in 1..365 &&
+        !state.submitLoading && !state.tooManyPending
 
     Column(
         modifier = Modifier
@@ -135,6 +185,16 @@ fun PaymentScreen(currency: String, onBack: () -> Unit) {
                     color = Color(0xFF18182A), letterSpacing = (-0.3).sp)
                 Text("Monthly Premium · ${card.amount}", fontSize = 10.sp,
                     color = Color(0xFFA0AAB8), modifier = Modifier.padding(top = 1.dp))
+            }
+            // My receipts
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(Color.White)
+                    .clickable { showReceipts = true }
+                    .padding(horizontal = 11.dp, vertical = 7.dp),
+            ) {
+                Text("My Receipts", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF279491))
             }
         }
 
@@ -185,7 +245,6 @@ fun PaymentScreen(currency: String, onBack: () -> Unit) {
                 .background(Brush.linearGradient(card.gradient, start = Offset(0f, 0f), end = Offset(500f, 400f)))
                 .padding(20.dp)
         ) {
-            // decor rings
             Box(modifier = Modifier.size(140.dp).align(Alignment.TopEnd).offset(x = 34.dp, y = (-34).dp)
                 .clip(CircleShape).border(28.dp, Color.White.copy(alpha = 0.08f), CircleShape))
             Box(modifier = Modifier.size(90.dp).align(Alignment.BottomStart).offset(x = (-14).dp, y = 28.dp)
@@ -268,12 +327,30 @@ fun PaymentScreen(currency: String, onBack: () -> Unit) {
         ) {
             Text("Your payment details", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF18182A))
 
-            PayField(label = "Full Name", value = name, onChange = { name = it },
+            PayField(label = "Full Name", value = name, onChange = { name = it.take(200) },
                 placeholder = "e.g. John Smith", keyboardType = KeyboardType.Text)
+            if (triedSubmit && !nameValid) FieldHint("Payer name is required (max 200 characters)")
 
             PayField(label = "Last 4 digits of your card", value = last4,
                 onChange = { last4 = it.filter(Char::isDigit).take(4) },
                 placeholder = "XXXX", keyboardType = KeyboardType.Number, mono = true)
+            if (triedSubmit && !last4Valid) FieldHint("Enter the last 4 digits of the card")
+
+            // Subscription duration
+            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
+                Text("Subscription duration", fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
+                    color = Color(0xFF8A96A8), letterSpacing = 0.3.sp)
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    DURATIONS.forEach { opt ->
+                        DurationChip(
+                            label = opt.label,
+                            active = durationDays == opt.days,
+                            modifier = Modifier.weight(1f),
+                            onClick = { durationDays = opt.days },
+                        )
+                    }
+                }
+            }
 
             // Upload receipt
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
@@ -284,7 +361,11 @@ fun PaymentScreen(currency: String, onBack: () -> Unit) {
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(11.dp))
                         .background(Color(0xFFF6F7FA))
-                        .border(1.5.dp, Color(0xFFD0D6E2), RoundedCornerShape(11.dp))
+                        .border(
+                            1.5.dp,
+                            if (fileErr != null) Color(0xFFEF4444) else Color(0xFFD0D6E2),
+                            RoundedCornerShape(11.dp),
+                        )
                         .clickable { picker.launch("*/*") }
                         .padding(14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -294,11 +375,19 @@ fun PaymentScreen(currency: String, onBack: () -> Unit) {
                         modifier = Modifier.size(34.dp).clip(RoundedCornerShape(10.dp)).background(Color(0xFFEDEEF2)),
                         contentAlignment = Alignment.Center
                     ) { Canvas(Modifier.size(16.dp)) { drawUploadIcon() } }
-                    Text(receiptName ?: "Tap to upload receipt", fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold, color = Color(0xFF8A96A8))
+                    Text(picked?.fileName ?: "Tap to upload receipt", fontSize = 11.sp,
+                        fontWeight = FontWeight.SemiBold, color = Color(0xFF8A96A8),
+                        maxLines = 1)
                     Text("JPG, PNG or PDF · max 5MB", fontSize = 9.5.sp, color = Color(0xFFB0BAC8))
                 }
+                if (fileErr != null) FieldHint(fileErr)
             }
+
+            if (state.tooManyPending) {
+                NoticeBanner("You already have 3 receipts pending review. You can't submit a new one until they are resolved.",
+                    Color(0xFFEF4444))
+            }
+            state.submitError?.let { if (!state.tooManyPending) NoticeBanner(it, Color(0xFFEF4444)) }
 
             // Submit
             Box(
@@ -310,41 +399,170 @@ fun PaymentScreen(currency: String, onBack: () -> Unit) {
                         if (canSubmit) Brush.linearGradient(listOf(Color(0xFF4ECAC5), Color(0xFF279491)))
                         else Brush.linearGradient(listOf(Color(0xFFE8EAF0), Color(0xFFE8EAF0)))
                     )
-                    .clickable(enabled = canSubmit) { submitted = true }
+                    .clickable(enabled = !state.submitLoading && !state.tooManyPending) {
+                        triedSubmit = true
+                        val p = picked
+                        if (nameValid && last4Valid && p != null && fileErr == null) {
+                            vm.submit(name, last4, durationDays, p)
+                        }
+                    }
                     .padding(vertical = 13.dp),
                 contentAlignment = Alignment.Center
             ) {
-                Text(if (submitted) "✓ Submitted" else "Submit Payment Info",
-                    fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
-                    color = if (canSubmit || submitted) Color.White else Color(0xFFA0AAB8))
-            }
-        }
-
-        // Success
-        if (submitted) {
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .shadow(8.dp, RoundedCornerShape(16.dp), spotColor = Color(0xFF279491))
-                    .clip(RoundedCornerShape(16.dp))
-                    .background(Brush.linearGradient(listOf(Color(0xFF3DBFBA), Color(0xFF279491))))
-                    .padding(horizontal = 16.dp, vertical = 14.dp),
-                verticalAlignment = Alignment.CenterVertically,
-                horizontalArrangement = Arrangement.spacedBy(12.dp)
-            ) {
-                Box(
-                    modifier = Modifier.size(36.dp).clip(CircleShape).background(Color.White.copy(alpha = 0.18f)),
-                    contentAlignment = Alignment.Center
-                ) { Canvas(Modifier.size(16.dp, 12.dp)) { drawCheckIcon() } }
-                Column {
-                    Text("Receipt submitted!", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                    Text("We'll verify and activate within 24h.", fontSize = 10.sp,
-                        color = Color.White.copy(alpha = 0.7f), modifier = Modifier.padding(top = 2.dp))
+                if (state.submitLoading) {
+                    CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+                } else {
+                    Text("Submit Payment Info",
+                        fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
+                        color = if (canSubmit) Color.White else Color(0xFFA0AAB8))
                 }
             }
         }
 
         Spacer(Modifier.height(4.dp))
+    }
+}
+
+// ---- Receipts list (status tracking) ----
+@Composable
+private fun ReceiptsView(
+    receipts: List<ReceiptResponse>,
+    loading: Boolean,
+    error: String?,
+    successMessage: String?,
+    onBack: () -> Unit,
+    onRefresh: () -> Unit,
+) {
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(Color(0xFFEDEEF2))
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 12.dp, vertical = 6.dp),
+        verticalArrangement = Arrangement.spacedBy(9.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 4.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier.size(34.dp).shadow(4.dp, CircleShape).clip(CircleShape)
+                    .background(Color.White).clickable { onBack() },
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(Modifier.size(8.dp, 14.dp)) {
+                    val p = Path().apply { moveTo(size.width, 0f); lineTo(0f, size.height / 2); lineTo(size.width, size.height) }
+                    drawPath(p, Color(0xFF18182A), style = Stroke(3.2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                }
+            }
+            Text("My Receipts", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold,
+                color = Color(0xFF18182A), modifier = Modifier.weight(1f))
+            Box(
+                modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Color.White)
+                    .clickable(enabled = !loading) { onRefresh() }.padding(horizontal = 11.dp, vertical = 7.dp),
+            ) { Text(if (loading) "..." else "↻ Refresh", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF279491)) }
+        }
+
+        successMessage?.let { NoticeBanner(it, Color(0xFF279491)) }
+        error?.let { NoticeBanner(it, Color(0xFFEF4444)) }
+
+        when {
+            loading && receipts.isEmpty() ->
+                Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                    CircularProgressIndicator(color = Color(0xFF279491))
+                }
+            receipts.isEmpty() ->
+                Box(Modifier.fillMaxWidth().padding(top = 40.dp), contentAlignment = Alignment.Center) {
+                    Text("You have not submitted any receipts yet", fontSize = 12.sp, color = Color(0xFFA0AAB8))
+                }
+            else -> receipts.forEach { ReceiptCard(it) }
+        }
+
+        Spacer(Modifier.height(4.dp))
+    }
+}
+
+@Composable
+private fun ReceiptCard(r: ReceiptResponse) {
+    val (chipColor, chipText) = when (r.status?.lowercase()) {
+        "approved" -> Color(0xFF10B981) to "Approved"
+        "rejected" -> Color(0xFFEF4444) to "Rejected"
+        else       -> Color(0xFFF59E0B) to "Pending review"
+    }
+    Column(
+        modifier = Modifier
+            .fillMaxWidth()
+            .shadow(4.dp, RoundedCornerShape(16.dp))
+            .clip(RoundedCornerShape(16.dp))
+            .background(Color.White)
+            .padding(14.dp),
+        verticalArrangement = Arrangement.spacedBy(6.dp)
+    ) {
+        Row(
+            modifier = Modifier.fillMaxWidth(),
+            horizontalArrangement = Arrangement.SpaceBetween,
+            verticalAlignment = Alignment.CenterVertically
+        ) {
+            Text("${r.requestedDurationDays ?: 30} days", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF18182A))
+            Box(
+                modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(chipColor.copy(alpha = 0.14f))
+                    .padding(horizontal = 10.dp, vertical = 4.dp)
+            ) { Text(chipText, fontSize = 10.sp, fontWeight = FontWeight.Bold, color = chipColor) }
+        }
+        ReceiptRow("Card", "**** ${r.lastFourDigits ?: "----"}")
+        ReceiptRow("Name", r.payerFullName ?: "—")
+        ReceiptRow("Submitted", r.submittedAt?.substringBefore('T') ?: "—")
+        r.reviewedAt?.let { ReceiptRow("Reviewed", it.substringBefore('T')) }
+        if (!r.adminNote.isNullOrBlank()) {
+            Box(
+                modifier = Modifier.fillMaxWidth().clip(RoundedCornerShape(9.dp))
+                    .background(chipColor.copy(alpha = 0.10f)).padding(horizontal = 10.dp, vertical = 8.dp)
+            ) { Text("Note: ${r.adminNote}", fontSize = 10.5.sp, color = chipColor, fontWeight = FontWeight.Medium) }
+        }
+    }
+}
+
+@Composable
+private fun ReceiptRow(label: String, value: String) {
+    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+        Text(label, fontSize = 10.5.sp, color = Color(0xFFA0AAB8))
+        Text(value, fontSize = 10.5.sp, fontWeight = FontWeight.Medium, color = Color(0xFF18182A))
+    }
+}
+
+@Composable
+private fun DurationChip(label: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+    Box(
+        modifier = modifier
+            .clip(RoundedCornerShape(10.dp))
+            .background(if (active) Color(0xFF279491) else Color(0xFFF6F7FA))
+            .border(1.5.dp, if (active) Color(0xFF279491) else Color(0xFFEAECF2), RoundedCornerShape(10.dp))
+            .clickable { onClick() }
+            .padding(vertical = 10.dp),
+        contentAlignment = Alignment.Center
+    ) {
+        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+            color = if (active) Color.White else Color(0xFF6B7A99))
+    }
+}
+
+@Composable
+private fun FieldHint(text: String) {
+    Text(text, fontSize = 10.sp, color = Color(0xFFEF4444), modifier = Modifier.padding(start = 2.dp))
+}
+
+@Composable
+private fun NoticeBanner(text: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(12.dp))
+            .background(color.copy(alpha = 0.12f))
+            .border(1.dp, color.copy(alpha = 0.3f), RoundedCornerShape(12.dp))
+            .padding(horizontal = 12.dp, vertical = 10.dp),
+    ) {
+        Text(text, fontSize = 11.sp, fontWeight = FontWeight.Medium, color = color)
     }
 }
 
@@ -423,16 +641,6 @@ private fun PayField(
     }
 }
 
-// ---- helpers ----
-private fun queryDisplayName(context: android.content.Context, uri: Uri): String? {
-    return runCatching {
-        context.contentResolver.query(uri, null, null, null, null)?.use { c ->
-            val idx = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
-            if (idx >= 0 && c.moveToFirst()) c.getString(idx) else null
-        }
-    }.getOrNull()
-}
-
 // ---- icons ----
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGatewayIcon() {
     val c = Color(0xFFA0AAB8); val s = Stroke(1.5f)
@@ -457,12 +665,6 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawUploadIcon() {
     drawLine(c, Offset(size.width * 0.125f, size.height * 0.78f), Offset(size.width * 0.875f, size.height * 0.78f), 1.5f, cap = StrokeCap.Round)
 }
 
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCheckIcon() {
-    drawPath(Path().apply {
-        moveTo(size.width * 0.06f, size.height * 0.5f); lineTo(size.width * 0.34f, size.height * 0.9f); lineTo(size.width * 0.94f, size.height * 0.08f)
-    }, Color.White, style = Stroke(2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
-}
-
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawUserIcon() {
     val c = Color(0xFFC0C8D4); val s = Stroke(1.2f, cap = StrokeCap.Round)
     drawCircle(c, radius = size.minDimension * 0.185f, center = Offset(size.width / 2, size.height * 0.35f), style = s)
@@ -474,7 +676,7 @@ private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawUserIcon() {
 }
 
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawCardSmallIcon() {
-    val c = Color(0xFFC0C8D4); val s = Stroke(1.2f, cap = StrokeCap.Round)
+    val c = Color(0xFFC0C8D4)
     drawRoundRect(c, topLeft = Offset(size.width * 0.08f, size.height * 0.23f),
         size = androidx.compose.ui.geometry.Size(size.width * 0.84f, size.height * 0.54f),
         cornerRadius = androidx.compose.ui.geometry.CornerRadius(3f), style = Stroke(1.2f))

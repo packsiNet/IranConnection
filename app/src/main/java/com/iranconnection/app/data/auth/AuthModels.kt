@@ -20,6 +20,27 @@ data class LogoutRequest(
     val refreshToken: String,
 )
 
+data class VerifyEmailRequest(
+    val email: String,
+    val code: String,
+)
+
+data class ForgotPasswordRequest(
+    val email: String,
+)
+
+data class ResetPasswordRequest(
+    val email: String,
+    val code: String,
+    val newPassword: String,
+)
+
+data class UpdateProfileRequest(
+    val fullName: String?,
+    val currentPassword: String?,
+    val newPassword: String?,
+)
+
 // ---- Success responses ----
 data class RegisterResponse(
     val userId: String?,

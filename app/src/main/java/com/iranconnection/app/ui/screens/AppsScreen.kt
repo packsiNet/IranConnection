@@ -69,12 +69,7 @@ fun AppsScreen(
     vm: AppsViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsState()
-    val context = LocalContext.current
-    val userPlan = remember {
-        context.getSharedPreferences("wireguard", android.content.Context.MODE_PRIVATE)
-            .getString("user_plan", "Free") ?: "Free"
-    }
-    val isPremiumUser = userPlan == "Premium"
+    val isPremiumUser = state.isPremium
 
     var query by remember { mutableStateOf("") }
     val q = query.trim().lowercase()

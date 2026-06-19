@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import com.iranconnection.app.data.subscription.SubscriptionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow
@@ -14,6 +15,9 @@ data class AppsUiState(
     val freeApps: List<IranianAppInfo> = emptyList(),
     val premiumApps: List<IranianAppInfo> = emptyList(),
     val enabledPackages: Set<String> = emptySet(),
+    val isPremium: Boolean = false,
+    /** Set when the catalog/subscription fetch failed and we fell back to the bundled list. */
+    val error: String? = null,
 )
 
 class AppsViewModel(app: Application) : AndroidViewModel(app) {
@@ -29,10 +33,21 @@ class AppsViewModel(app: Application) : AndroidViewModel(app) {
 
     fun loadApps() {
         viewModelScope.launch {
-            _state.value = _state.value.copy(isLoading = true)
-            val detected = IranianAppDetector.detectInstalledIranianApps(getApplication())
-            // Before the user has ever touched a toggle, everything detected starts enabled
-            // (matches the previous app_enabled_* default) instead of routing nothing.
+            _state.value = _state.value.copy(isLoading = true, error = null)
+
+            // 1) Global app catalog. Fall back to the bundled list so the screen isn't empty offline.
+            val catalogResult = SubscriptionRepository.getAppCatalog()
+            val catalog = catalogResult.getOrNull()?.takeIf { it.isNotEmpty() }
+                ?: IranianAppList.asCatalog()
+
+            // 2) User plan decides whether Premium apps are locked.
+            val plan = SubscriptionRepository.getSubscription().getOrNull()?.plan
+            val isPremium = plan == "Premium" || plan == "Admin"
+
+            // 3) Keep only catalog apps installed on the device.
+            val detected = IranianAppDetector.detectInstalledIranianApps(getApplication(), catalog)
+
+            // Before the user touches a toggle, everything detected starts enabled.
             val savedEnabled = if (enabledPrefs.contains("enabled_apps")) {
                 enabledPrefs.getString("enabled_apps", "")
                     .orEmpty()
@@ -43,11 +58,14 @@ class AppsViewModel(app: Application) : AndroidViewModel(app) {
             } else {
                 detected.map { it.packageName }.toSet()
             }
+
             _state.value = _state.value.copy(
                 isLoading = false,
                 freeApps = detected.filter { it.isFree },
                 premiumApps = detected.filter { !it.isFree },
                 enabledPackages = savedEnabled,
+                isPremium = isPremium,
+                error = if (catalogResult.isFailure) "Failed to load app list; showing local list" else null,
             )
         }
     }

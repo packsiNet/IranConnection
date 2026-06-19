@@ -13,33 +13,26 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.navigationBarsPadding
-import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.statusBarsPadding
-import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.style.TextAlign
-import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
-import androidx.lifecycle.lifecycleScope
+import androidx.lifecycle.ViewModel
+import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.iranconnection.app.data.ConfigFetcher
-import com.iranconnection.app.data.auth.ApiClient
-import com.iranconnection.app.data.UpdateInfo
-import com.iranconnection.app.data.UpdateManager
 import com.iranconnection.app.data.VpnStatus
 import com.iranconnection.app.data.VpnViewModel
-import com.iranconnection.app.data.WireGuardConfig
+import com.iranconnection.app.data.auth.ApiClient
+import com.iranconnection.app.data.deviceauth.AppStartState
+import com.iranconnection.app.data.deviceauth.DeviceAuthViewModel
+import com.iranconnection.app.data.UpdateInfo
+import com.iranconnection.app.data.UpdateManager
 import com.iranconnection.app.ui.components.AppBottomNav
 import com.iranconnection.app.ui.components.NavTab
 import com.iranconnection.app.ui.components.UpdateDialog
@@ -48,63 +41,63 @@ import com.iranconnection.app.ui.screens.BrowserScreen
 import com.iranconnection.app.ui.screens.HomeScreen
 import com.iranconnection.app.ui.screens.LogScreen
 import com.iranconnection.app.ui.screens.ProfileScreen
-import com.iranconnection.app.ui.screens.ServersScreen
+import com.iranconnection.app.ui.screens.SplashScreen
 import com.iranconnection.app.ui.theme.AppColors
 import com.iranconnection.app.ui.theme.IranConnectionTheme
-import kotlinx.coroutines.launch
-
-private const val CONFIG_URL = "https://gist.githubusercontent.com/packsiNet/4358f6d56dcb7cceefb38f6e3a7573ba/raw/config.json"
+import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
 
-    private var configStatus: ConfigFetchStatus by mutableStateOf(ConfigFetchStatus.Loading)
-
     override fun onCreate(savedInstanceState: Bundle?) {
-        // Light system bars = dark status/nav icons, so they stay visible on the app's light background.
         enableEdgeToEdge(
             statusBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
             navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
 
-        // Build the HTTP/auth layer once before any screen/ViewModel uses it.
         ApiClient.init(applicationContext)
-
-        lifecycleScope.launch {
-            val config = ConfigFetcher.fetch(CONFIG_URL)
-            if (config != null) {
-                saveConfig(config)
-                configStatus = ConfigFetchStatus.Success
-            } else {
-                configStatus = ConfigFetchStatus.Error
-            }
-        }
 
         setContent {
             IranConnectionTheme {
-                AppRoot(configStatus = configStatus)
-            }
-        }
-    }
+                val authViewModel: DeviceAuthViewModel = viewModel(
+                    factory = object : ViewModelProvider.Factory {
+                        @Suppress("UNCHECKED_CAST")
+                        override fun <T : ViewModel> create(modelClass: Class<T>): T =
+                            DeviceAuthViewModel(applicationContext) as T
+                    }
+                )
+                val authState by authViewModel.state.collectAsState()
 
-    private fun saveConfig(config: WireGuardConfig) {
-        getSharedPreferences("wireguard", MODE_PRIVATE).edit().apply {
-            putString("endpoint", config.serverEndpoint)
-            putString("server_pub_key", config.serverPublicKey)
-            putString("client_priv_key", config.clientPrivateKey)
-            putString("address", config.clientAddress)
-            putString("dns", config.dns)
-            val iranianApps = config.iranianApps
-            if (iranianApps != null && iranianApps.isNotEmpty()) {
-                putString("iranian_apps", iranianApps.joinToString(","))
+                when (authState.appStartState) {
+                    AppStartState.CHECKING,
+                    AppStartState.LOADING_CONFIG ->
+                        SplashScreen(
+                            completedSteps = authState.loadingCompletedSteps,
+                            failedStep = authState.loadingFailedStep,
+                        )
+                    AppStartState.ERROR ->
+                        SplashScreen(
+                            message = authState.errorMessage ?: "Failed to connect. Please check your connection.",
+                            isError = true,
+                            onRetry = { authViewModel.retryLoadConfig() },
+                            onSkip  = { authViewModel.forceReady() },
+                            completedSteps = authState.loadingCompletedSteps,
+                            failedStep = authState.loadingFailedStep,
+                        )
+                    AppStartState.READY ->
+                        AppRoot(onSignOut = { authViewModel.signOut() })
+                }
             }
-            apply()
         }
     }
 }
 
 @Composable
-private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewModel()) {
+private fun AppRoot(
+    onSignOut: () -> Unit = {},
+    vm: VpnViewModel = viewModel(),
+) {
     val state by vm.state.collectAsState()
     var tab by remember { mutableStateOf(NavTab.HOME) }
     val context = LocalContext.current
@@ -133,28 +126,21 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
     val vpnPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) {
-            vm.startTunnel()
-        }
+        if (result.resultCode == Activity.RESULT_OK) vm.startTunnel()
     }
 
     var showLogPanel by remember { mutableStateOf(false) }
 
-    // Button stays tappable while connecting so the user can cancel a connect attempt that's
-    // taking too long; it's only disabled mid-disconnect, where there's nothing left to cancel.
     val buttonEnabled = state.status != VpnStatus.DISCONNECTING
     val onToggle: () -> Unit = {
         when (state.status) {
             VpnStatus.CONNECTED -> vm.stopTunnel()
             VpnStatus.CONNECTING -> vm.cancelConnecting()
-            VpnStatus.DISCONNECTING -> { /* in transition — ignore */ }
+            VpnStatus.DISCONNECTING -> {}
             else -> {
                 val intent = VpnService.prepare(context)
-                if (intent == null) {
-                    vm.startTunnel()
-                } else {
-                    vpnPermissionLauncher.launch(intent)
-                }
+                if (intent == null) vm.startTunnel()
+                else vpnPermissionLauncher.launch(intent)
             }
         }
     }
@@ -166,37 +152,36 @@ private fun AppRoot(configStatus: ConfigFetchStatus, vm: VpnViewModel = viewMode
             .statusBarsPadding(),
     ) {
         Column(Modifier.fillMaxSize()) {
-        Column(Modifier.weight(1f)) {
-            when (tab) {
-                NavTab.HOME -> HomeScreen(
-                    connected = state.connected,
-                    statusLabel = state.statusLabel,
-                    seconds = state.seconds,
-                    serverIp = state.serverIp,
-                    onToggle = onToggle,
-                    onServerCardClick = { },
-                    onShowLogs = { showLogPanel = true },
-                    configStatus = configStatus,
-                    buttonEnabled = buttonEnabled,
-                )
-                NavTab.APPS -> AppsScreen(
-                    onClose = { tab = NavTab.HOME },
-                )
-                NavTab.BROWSER -> BrowserScreen()
-                NavTab.PROFILE -> ProfileScreen()
+            Column(Modifier.weight(1f)) {
+                when (tab) {
+                    NavTab.HOME -> HomeScreen(
+                        connected = state.connected,
+                        statusLabel = state.statusLabel,
+                        seconds = state.seconds,
+                        serverIp = state.serverIp,
+                        onToggle = onToggle,
+                        onServerCardClick = {},
+                        onShowLogs = { showLogPanel = true },
+                        onGoToLogin = { tab = NavTab.PROFILE },
+                        configStatus = ConfigFetchStatus.Success,
+                        buttonEnabled = buttonEnabled,
+                    )
+                    NavTab.APPS -> AppsScreen(onClose = { tab = NavTab.HOME })
+                    NavTab.BROWSER -> BrowserScreen()
+                    NavTab.PROFILE -> ProfileScreen(onSignOut = onSignOut)
+                }
             }
+            AppBottomNav(
+                selected = tab,
+                onSelect = { tab = it },
+                modifier = Modifier.navigationBarsPadding(),
+            )
         }
-        AppBottomNav(
-            selected = tab,
-            onSelect = { tab = it },
-            modifier = Modifier.navigationBarsPadding(),
-        )
-        } // end inner Column
 
         if (showLogPanel) {
             LogScreen(onClose = { showLogPanel = false })
         }
-    } // end Box
+    }
 }
 
 sealed class ConfigFetchStatus {

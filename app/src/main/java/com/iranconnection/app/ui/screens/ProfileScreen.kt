@@ -1,5 +1,6 @@
 package com.iranconnection.app.ui.screens
 
+import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
 import androidx.compose.foundation.layout.*
@@ -28,6 +29,7 @@ import androidx.compose.ui.unit.*
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.iranconnection.app.data.auth.AuthViewModel
 import com.iranconnection.app.data.auth.UserProfile
+import com.iranconnection.app.data.subscription.SubscriptionResponse
 
 // ---- Color palette (Profile-screen specific) ----
 private val TealStart   = Color(0xFF3DBFBA)
@@ -48,16 +50,22 @@ private val Red         = Color(0xFFEF4444)
 
 // ---- Main screen ----
 @Composable
-fun ProfileScreen(vm: AuthViewModel = viewModel()) {
+fun ProfileScreen(vm: AuthViewModel = viewModel(), onSignOut: () -> Unit = {}) {
     val state by vm.state.collectAsState()
 
-    var showRegister by rememberSaveable { mutableStateOf(false) }
+    var authMode by rememberSaveable { mutableStateOf(AuthMode.LOGIN) }
+    var pendingEmail by rememberSaveable { mutableStateOf("") }
     var currency by rememberSaveable { mutableStateOf("usd") }
     var showPayment by rememberSaveable { mutableStateOf(false) }
+    var showVerify by rememberSaveable { mutableStateOf(false) }
+    var showEdit by rememberSaveable { mutableStateOf(false) }
 
-    // Pull fresh profile whenever we transition into the logged-in state.
+    // Pull fresh profile + subscription whenever we transition into the logged-in state.
     LaunchedEffect(state.isLoggedIn) {
-        if (state.isLoggedIn) vm.loadProfile()
+        if (state.isLoggedIn) {
+            vm.loadProfile()
+            vm.loadSubscription()
+        }
     }
 
     Box(
@@ -66,37 +74,90 @@ fun ProfileScreen(vm: AuthViewModel = viewModel()) {
             .background(BgScreen)
     ) {
         if (!state.isLoggedIn) {
-            if (showRegister) {
-                RegisterScreen(vm = vm, onLoginClick = { showRegister = false })
-            } else {
-                LoginScreen(vm = vm, onRegisterClick = { showRegister = true })
+            when (authMode) {
+                AuthMode.LOGIN -> LoginScreen(
+                    vm = vm,
+                    onRegisterClick = { authMode = AuthMode.REGISTER },
+                    onForgotClick = { authMode = AuthMode.FORGOT },
+                )
+                AuthMode.REGISTER -> RegisterScreen(
+                    vm = vm,
+                    onLoginClick = { authMode = AuthMode.LOGIN },
+                    onRegistered = { e -> pendingEmail = e; authMode = AuthMode.VERIFY },
+                )
+                AuthMode.VERIFY -> VerifyEmailScreen(
+                    vm = vm, email = pendingEmail,
+                    onVerified = { authMode = AuthMode.LOGIN },
+                    onBack = { authMode = AuthMode.LOGIN },
+                )
+                AuthMode.FORGOT -> ForgotPasswordScreen(
+                    vm = vm,
+                    onCodeSent = { e -> pendingEmail = e; authMode = AuthMode.RESET },
+                    onBack = { authMode = AuthMode.LOGIN },
+                )
+                AuthMode.RESET -> ResetPasswordScreen(
+                    vm = vm, email = pendingEmail,
+                    onReset = { authMode = AuthMode.LOGIN },
+                    onBack = { authMode = AuthMode.LOGIN },
+                )
             }
         } else {
             ProfileView(
                 profile = state.profile,
+                subscription = state.subscription,
+                subscriptionNotFound = state.subscriptionNotFound,
                 email = state.email,
                 fullName = state.fullName,
+                emailVerified = state.profile?.isEmailVerified ?: true,
                 currency = currency,
                 onCurrencyChange = { currency = it },
                 onPay = { showPayment = true },
-                onExit = { vm.logout() },
+                onVerifyEmail = { showVerify = true },
+                onEditProfile = { showEdit = true },
+                onExit = { vm.logout(); onSignOut() },
             )
             if (showPayment) {
-                PaymentScreen(currency = currency, onBack = { showPayment = false })
+                PaymentScreen(
+                    currency = currency,
+                    onBack = { showPayment = false },
+                    onApproved = { vm.loadSubscription() },
+                )
+            }
+            if (showVerify) {
+                VerifyEmailScreen(
+                    vm = vm, email = state.email,
+                    onVerified = { showVerify = false; vm.loadProfile() },
+                    onBack = { showVerify = false },
+                )
+            }
+            if (showEdit) {
+                EditProfileScreen(
+                    vm = vm,
+                    currentName = state.fullName,
+                    onDone = { showEdit = false },
+                    onBack = { showEdit = false },
+                )
             }
         }
     }
 }
 
+private enum class AuthMode { LOGIN, REGISTER, VERIFY, FORGOT, RESET }
+
 // ---- Profile view (logged in) ----
 @Composable
 private fun ProfileView(
     profile: UserProfile?,
+    subscription: SubscriptionResponse?,
+    subscriptionNotFound: Boolean,
     email: String,
     fullName: String,
+    emailVerified: Boolean,
     currency: String,
     onCurrencyChange: (String) -> Unit,
     onPay: () -> Unit,
+    onVerifyEmail: () -> Unit,
+    onEditProfile: () -> Unit,
     onExit: () -> Unit,
 ) {
     // No embedded bottom nav here — the Profile tab reuses the same shared
@@ -111,9 +172,46 @@ private fun ProfileView(
         // 1. Profile hero card
         ProfileHeroCard(
             profile = profile,
+            subscription = subscription,
             email = email,
             fullName = fullName,
         )
+
+        // Email-not-verified banner with a "verify" action
+        if (!emailVerified) {
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .clip(RoundedCornerShape(13.dp))
+                    .background(Amber.copy(alpha = 0.14f))
+                    .padding(horizontal = 13.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
+            ) {
+                Text("⚠", fontSize = 13.sp, color = Color(0xFFB8860B))
+                Text("Your email is not verified", fontSize = 11.5.sp, fontWeight = FontWeight.Medium,
+                    color = Color(0xFFB8860B), modifier = Modifier.weight(1f))
+                Box(
+                    modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0xFFB8860B))
+                        .clickable { onVerifyEmail() }.padding(horizontal = 11.dp, vertical = 5.dp),
+                ) { Text("Verify email", fontSize = 10.5.sp, fontWeight = FontWeight.Bold, color = Color.White) }
+            }
+        }
+
+        // Subscription state notices
+        if (subscriptionNotFound) {
+            SubscriptionNotice(
+                text = "No subscription — upgrade for full access.",
+                color = Amber,
+            )
+        } else if (subscription != null && (!subscription.isActive || (subscription.daysRemaining ?: 0) <= 7)) {
+            val days = subscription.daysRemaining ?: 0
+            SubscriptionNotice(
+                text = if (!subscription.isActive) "Your subscription has expired — renew now."
+                       else "Only $days days left — renew now.",
+                color = Red,
+            )
+        }
 
         // 2. Mini stats row
         Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -129,7 +227,18 @@ private fun ProfileView(
         // 4. Menu list
         MenuCard()
 
-        // 5. Exit button
+        // 5. Edit profile / change password
+        Button(
+            onClick = onEditProfile,
+            modifier = Modifier.fillMaxWidth().height(44.dp),
+            shape = RoundedCornerShape(15.dp),
+            colors = ButtonDefaults.buttonColors(containerColor = CardWhite),
+            elevation = ButtonDefaults.buttonElevation(defaultElevation = 2.dp)
+        ) {
+            Text("Edit profile / Change password", fontSize = 12.5.sp, fontWeight = FontWeight.Bold, color = TealMid)
+        }
+
+        // 6. Exit button
         Button(
             onClick = onExit,
             modifier = Modifier.fillMaxWidth().height(44.dp),
@@ -146,21 +255,44 @@ private fun ProfileView(
 
 // ---- Profile hero card ----
 @Composable
-private fun ProfileHeroCard(profile: UserProfile?, email: String, fullName: String) {
+private fun SubscriptionNotice(text: String, color: Color) {
+    Row(
+        modifier = Modifier
+            .fillMaxWidth()
+            .clip(RoundedCornerShape(13.dp))
+            .background(color.copy(alpha = 0.12f))
+            .padding(horizontal = 13.dp, vertical = 10.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.spacedBy(7.dp),
+    ) {
+        Text("⚠", fontSize = 13.sp, color = color)
+        Text(text, fontSize = 11.5.sp, fontWeight = FontWeight.Medium, color = color)
+    }
+}
+
+@Composable
+private fun ProfileHeroCard(
+    profile: UserProfile?,
+    subscription: SubscriptionResponse?,
+    email: String,
+    fullName: String,
+) {
     val pulse by rememberInfiniteTransition(label = "pulse").animateFloat(
         initialValue = 1f, targetValue = 0.4f,
         animationSpec = infiniteRepeatable(tween(2000, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "pulseAlpha"
     )
 
-    val sub = profile?.subscription
+    // Prefer the dedicated /api/subscription response; fall back to the profile's embedded one.
+    val profileSub = profile?.subscription
     val displayName = fullName.ifBlank { profile?.fullName ?: "" }.ifBlank { "—" }
     val displayEmail = email.ifBlank { profile?.email ?: "" }
-    val planLabel = sub?.plan?.ifBlank { null } ?: "Free"
+    val planLabel = (subscription?.plan ?: profileSub?.plan)?.ifBlank { null } ?: "Free"
     val avatarLetter = displayName.firstOrNull()?.uppercaseChar()?.toString()
         ?: displayEmail.firstOrNull()?.uppercaseChar()?.toString() ?: "?"
-    val activeUntil = sub?.expireDate?.substringBefore('T')?.ifBlank { null } ?: "—"
-    val daysRemaining = sub?.daysRemaining
+    val expireDate = subscription?.expireDate ?: profileSub?.expireDate
+    val activeUntil = expireDate?.substringBefore('T')?.ifBlank { null } ?: "—"
+    val daysRemaining = subscription?.daysRemaining ?: profileSub?.daysRemaining
     val remainingLabel = daysRemaining?.let { "$it days" } ?: "—"
     val progress = daysRemaining?.let { (it / 30f).coerceIn(0f, 1f) } ?: 0f
 
@@ -654,3 +786,127 @@ private fun DrawScope.drawSupportIcon() {
 }
 
 
+
+// ---- Edit profile / change password (H) ----
+@Composable
+private fun EditProfileScreen(
+    vm: AuthViewModel,
+    currentName: String,
+    onDone: () -> Unit,
+    onBack: () -> Unit,
+) {
+    val state by vm.state.collectAsState()
+    var fullName by rememberSaveable { mutableStateOf(currentName) }
+    var currentPw by rememberSaveable { mutableStateOf("") }
+    var newPw by rememberSaveable { mutableStateOf("") }
+    var pwVisible by rememberSaveable { mutableStateOf(false) }
+    var err by remember { mutableStateOf<String?>(null) }
+
+    LaunchedEffect(state.updateSuccess) {
+        if (state.updateSuccess) { kotlinx.coroutines.delay(900); vm.clearUpdateState(); onDone() }
+    }
+    BackHandler(onBack = onBack)
+
+    val submit = {
+        val wantsPwChange = newPw.isNotBlank() || currentPw.isNotBlank()
+        val nameChanged = fullName.trim() != currentName.trim()
+        val localErr = when {
+            wantsPwChange && currentPw.isBlank() -> "Enter your current password"
+            wantsPwChange && newPw.length < 8 -> "New password must be at least 8 characters"
+            wantsPwChange && !newPw.any { it in 'A'..'Z' } -> "New password needs at least one uppercase letter (A-Z)"
+            wantsPwChange && !newPw.any { it in '0'..'9' } -> "New password needs at least one digit (0-9)"
+            !wantsPwChange && !nameChanged -> "No changes made"
+            else -> null
+        }
+        err = localErr
+        if (localErr == null) {
+            vm.clearUpdateState()
+            vm.updateProfile(
+                fullName = if (nameChanged) fullName.trim() else null,
+                currentPassword = if (wantsPwChange) currentPw else null,
+                newPassword = if (wantsPwChange) newPw else null,
+            )
+        }
+    }
+
+    Column(
+        modifier = Modifier
+            .fillMaxSize()
+            .background(BgScreen)
+            .verticalScroll(rememberScrollState())
+            .padding(horizontal = 14.dp, vertical = 10.dp),
+        verticalArrangement = Arrangement.spacedBy(11.dp)
+    ) {
+        // Top bar
+        Row(
+            modifier = Modifier.fillMaxWidth().padding(top = 2.dp, bottom = 2.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp)
+        ) {
+            Box(
+                modifier = Modifier.size(34.dp).shadow(4.dp, CircleShape).clip(CircleShape)
+                    .background(Color.White).clickable { onBack() },
+                contentAlignment = Alignment.Center
+            ) {
+                Canvas(Modifier.size(8.dp, 14.dp)) {
+                    val p = Path().apply { moveTo(size.width, 0f); lineTo(0f, size.height / 2); lineTo(size.width, size.height) }
+                    drawPath(p, TextPrimary, style = Stroke(3.2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                }
+            }
+            Text("Edit Profile", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold, color = TextPrimary)
+        }
+
+        Text("Name", fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = TextMuted)
+        AuthField(
+            value = fullName,
+            onValueChange = { fullName = it; if (err != null) err = null },
+            placeholder = "Full name",
+            leadingIcon = { Box(Modifier.size(13.dp).clip(CircleShape).background(TealMid)) },
+        )
+
+        Text("Change password (optional)", fontSize = 10.5.sp, fontWeight = FontWeight.SemiBold, color = TextMuted)
+        AuthField(
+            value = currentPw,
+            onValueChange = { currentPw = it; if (err != null) err = null },
+            placeholder = "Current password",
+            keyboardType = KeyboardType.Password,
+            visualTransformation = if (pwVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            leadingIcon = { Canvas(Modifier.size(15.dp)) { drawLockIcon() } },
+        )
+        AuthField(
+            value = newPw,
+            onValueChange = { newPw = it; if (err != null) err = null },
+            placeholder = "New password",
+            keyboardType = KeyboardType.Password,
+            visualTransformation = if (pwVisible) VisualTransformation.None else PasswordVisualTransformation(),
+            leadingIcon = { Canvas(Modifier.size(15.dp)) { drawLockIcon() } },
+            trailingIcon = {
+                Box(Modifier.clickable { pwVisible = !pwVisible }.padding(6.dp)) {
+                    Canvas(Modifier.size(18.dp)) { drawEyeIcon(pwVisible) }
+                }
+            },
+        )
+
+        err?.let { Text(it, fontSize = 11.sp, color = Red, fontWeight = FontWeight.Medium) }
+        state.updateError?.let { Text(it, fontSize = 11.sp, color = Red, fontWeight = FontWeight.Medium) }
+        if (state.updateSuccess) Text("Changes saved successfully", fontSize = 11.sp, color = TealMid, fontWeight = FontWeight.Medium)
+
+        Spacer(Modifier.height(2.dp))
+        Box(
+            modifier = Modifier
+                .fillMaxWidth()
+                .clip(RoundedCornerShape(13.dp))
+                .background(Brush.linearGradient(listOf(Color(0xFF4ECAC5), TealMid)))
+                .clickable(enabled = !state.updateLoading) { submit() }
+                .padding(vertical = 13.dp),
+            contentAlignment = Alignment.Center
+        ) {
+            if (state.updateLoading) {
+                CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
+            } else {
+                Text("Save changes", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+            }
+        }
+        Spacer(Modifier.height(8.dp))
+    }
+}

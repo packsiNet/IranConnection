@@ -2,43 +2,39 @@ package com.iranconnection.app.data
 
 import android.content.Context
 import android.content.pm.PackageManager
+import com.iranconnection.app.data.subscription.CatalogApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
-/** Detects which Iranian apps from the server-pushed allow-list are actually installed on the device. */
+/**
+ * Matches the global app catalog (from GET /api/subscription/apps) against the apps
+ * actually installed on the device. Only catalog entries that are installed are returned.
+ * `isFree` comes from the catalog, not from the device.
+ */
 object IranianAppDetector {
 
-    suspend fun detectInstalledIranianApps(context: Context): List<IranianAppInfo> =
-        withContext(Dispatchers.IO) {
-            val prefs = context.getSharedPreferences("wireguard", Context.MODE_PRIVATE)
+    suspend fun detectInstalledIranianApps(
+        context: Context,
+        catalog: List<CatalogApp>,
+    ): List<IranianAppInfo> = withContext(Dispatchers.IO) {
+        if (catalog.isEmpty()) return@withContext emptyList()
 
-            // Falls back to the bundled catalog when the server hasn't pushed allowed_packages/
-            // free_packages yet, so the screen isn't empty on a fresh install.
-            val allowedPackages = prefs.getString("allowed_packages", null)
-                ?.splitToPackageSet()
-                ?: IranianAppList.packageNames.toSet()
-            val freePackages = prefs.getString("free_packages", null)
-                ?.splitToPackageSet()
-                ?: IranianAppList.FREE_PACKAGES
+        val byPackage = catalog.associateBy { it.packageName }
+        val pm = context.packageManager
 
-            if (allowedPackages.isEmpty()) return@withContext emptyList()
-
-            val pm = context.packageManager
-            val installed = pm.getInstalledApplications(PackageManager.GET_META_DATA)
-
-            installed
-                .filter { it.packageName in allowedPackages }
-                .map { app ->
-                    IranianAppInfo(
-                        packageName = app.packageName,
-                        appName = pm.getApplicationLabel(app).toString(),
-                        icon = pm.getApplicationIcon(app.packageName),
-                        isFree = app.packageName in freePackages,
-                    )
-                }
-                .sortedWith(compareBy({ !it.isFree }, { it.appName.lowercase() }))
-        }
-
-    private fun String.splitToPackageSet(): Set<String> =
-        split(",").map { it.trim() }.filter { it.isNotEmpty() }.toSet()
+        pm.getInstalledApplications(PackageManager.GET_META_DATA)
+            .mapNotNull { app ->
+                val entry = byPackage[app.packageName] ?: return@mapNotNull null
+                IranianAppInfo(
+                    packageName = app.packageName,
+                    appName = entry.nameEn?.ifBlank { null }
+                        ?: entry.nameFa?.ifBlank { null }
+                        ?: pm.getApplicationLabel(app).toString(),
+                    nameEn = entry.nameEn.orEmpty(),
+                    icon = pm.getApplicationIcon(app.packageName),
+                    isFree = entry.isFree,
+                )
+            }
+            .sortedWith(compareBy({ !it.isFree }, { it.appName.lowercase() }))
+    }
 }

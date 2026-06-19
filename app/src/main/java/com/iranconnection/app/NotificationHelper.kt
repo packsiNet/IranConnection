@@ -26,7 +26,7 @@ object NotificationHelper {
     fun buildNotification(context: Context): Notification =
         NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("IranConnect")
-            .setContentText("در حال محافظت از اپ‌های ایرانی")
+            .setContentText("Protecting Iranian apps")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
             .build()

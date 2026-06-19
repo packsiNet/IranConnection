@@ -76,7 +76,7 @@ fun TabGridScreen(
                 }
                 // Done button
                 TextButton(onClick = onDismiss) {
-                    Text("تمام", color = Color(0xFF1A73E8), fontSize = 15.sp)
+                    Text("Done", color = Color(0xFF1A73E8), fontSize = 15.sp)
                 }
             }
         }
@@ -155,7 +155,7 @@ fun TabCard(
 
                 // URL preview
                 Text(
-                    text = tab.url.ifEmpty { "صفحه جدید" },
+                    text = tab.url.ifEmpty { "New tab" },
                     fontSize = 10.sp,
                     color = Color(0xFF888888),
                     maxLines = 2,

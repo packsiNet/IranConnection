@@ -1,5 +1,7 @@
 package com.iranconnection.app.data
 
+import com.iranconnection.app.data.subscription.CatalogApp
+
 object IranianAppList {
 
     /** Package names in the free tier — shown at top, no paywall. */
@@ -90,4 +92,14 @@ object IranianAppList {
     )
 
     val packageNames: List<String> get() = apps.map { it.packageName }
+
+    /** Offline fallback for GET /api/subscription/apps when the catalog can't be fetched. */
+    fun asCatalog(): List<CatalogApp> = apps.map {
+        CatalogApp(
+            packageName = it.packageName,
+            nameEn = it.nameEn,
+            nameFa = it.nameFa,
+            isFree = it.packageName in FREE_PACKAGES,
+        )
+    }
 }
