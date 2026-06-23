@@ -35,6 +35,7 @@ import androidx.compose.ui.platform.LocalClipboardManager
 import androidx.compose.ui.text.AnnotatedString
 import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
@@ -55,73 +56,59 @@ private data class BankCard(
     val amount: String,
 )
 
-private fun bankCardFor(currency: String): BankCard =
+private fun bankCardFor(currency: String, plan: Plan): BankCard =
     if (currency == "usd") BankCard(
         bank = "USD Bank",
         number = "4937 2420 2574 6817",
         holder = "LALEH MANSOURI",
         gradient = listOf(Color(0xFFE63950), Color(0xFFB01030), Color(0xFF7A0C24)),
         shadow = Color(0x5CC81838),
-        amount = "$2.50 USD",
+        amount = plan.usdPrice,
     ) else BankCard(
         bank = "Iranian Bank",
         number = "6219 8618 0150 9695",
         holder = "SHAHRAM OVEISI",
         gradient = listOf(Color(0xFF2D8FD8), Color(0xFF1868B2), Color(0xFF0C3D78)),
         shadow = Color(0x5C1878C8),
-        amount = "300,000 TMN",
+        amount = "${plan.tmnPrice} تومان",
     )
 
-// ---- Duration presets (durationDays 1..365) ----
-private data class DurationOption(val days: Int, val label: String)
-private val DURATIONS = listOf(
-    DurationOption(30, "1 Month"),
-    DurationOption(90, "3 Months"),
-    DurationOption(365, "1 Year"),
-)
+// ---- Plan definitions ----
+private enum class Plan(val label: String, val usdPrice: String, val tmnPrice: String) {
+    PRO("PRO", "$3", "500,000"),
+    PREMIUM("Premium", "$5", "700,000"),
+}
 
 // ---- Payment screen ----
 @Composable
 fun PaymentScreen(
-    currency: String,
     onBack: () -> Unit,
     onApproved: () -> Unit = {},
     vm: PaymentViewModel = viewModel(),
 ) {
     val clipboard = LocalClipboardManager.current
-    val card = remember(currency) { bankCardFor(currency) }
     val state by vm.state.collectAsState()
+
+    var selectedPlan by rememberSaveable { mutableStateOf(Plan.PRO) }
+    var selectedCurrency by rememberSaveable { mutableStateOf("tmn") }
+    val card = remember(selectedCurrency, selectedPlan) { bankCardFor(selectedCurrency, selectedPlan) }
 
     var name by rememberSaveable { mutableStateOf("") }
     var last4 by rememberSaveable { mutableStateOf("") }
-    var durationDays by rememberSaveable { mutableStateOf(30) }
     var picked by remember { mutableStateOf<PickedReceipt?>(null) }
     var copied by remember { mutableStateOf(false) }
     var showReceipts by rememberSaveable { mutableStateOf(false) }
     var triedSubmit by rememberSaveable { mutableStateOf(false) }
 
-    val picker = rememberLauncherForActivityResult(
-        ActivityResultContracts.GetContent()
-    ) { uri: Uri? -> if (uri != null) picked = vm.inspectFile(uri) }
-
-    LaunchedEffect(copied) {
-        if (copied) { delay(2200); copied = false }
+    val picker = rememberLauncherForActivityResult(ActivityResultContracts.GetContent()) { uri: Uri? ->
+        if (uri != null) picked = vm.inspectFile(uri)
     }
 
-    // On 201, jump to the receipts list so the user can track the status.
-    LaunchedEffect(state.successMessage) {
-        if (state.successMessage != null) showReceipts = true
-    }
-
-    // Load + light-poll receipts while the list is open.
+    LaunchedEffect(copied) { if (copied) { delay(2200); copied = false } }
+    LaunchedEffect(state.successMessage) { if (state.successMessage != null) showReceipts = true }
     LaunchedEffect(showReceipts) {
-        if (showReceipts) {
-            vm.loadReceipts()
-            while (true) { delay(6000); vm.loadReceipts() }
-        }
+        if (showReceipts) { vm.loadReceipts(); while (true) { delay(6000); vm.loadReceipts() } }
     }
-
-    // When a receipt flips to Approved, refresh the subscription so the new plan shows.
     var approvedNotified by rememberSaveable { mutableStateOf(false) }
     LaunchedEffect(state.receipts) {
         val anyApproved = state.receipts.any { it.status.equals("Approved", ignoreCase = true) }
@@ -146,8 +133,7 @@ fun PaymentScreen(
     val nameValid = name.trim().isNotEmpty() && name.trim().length <= 200
     val last4Valid = last4.length == 4
     val fileValid = picked != null && fileErr == null
-    val canSubmit = nameValid && last4Valid && fileValid && durationDays in 1..365 &&
-        !state.submitLoading && !state.tooManyPending
+    val canSubmit = nameValid && last4Valid && fileValid && !state.submitLoading && !state.tooManyPending
 
     Column(
         modifier = Modifier
@@ -164,139 +150,74 @@ fun PaymentScreen(
             horizontalArrangement = Arrangement.spacedBy(10.dp)
         ) {
             Box(
-                modifier = Modifier
-                    .size(34.dp)
-                    .shadow(4.dp, CircleShape)
-                    .clip(CircleShape)
-                    .background(Color.White)
-                    .clickable { onBack() },
+                modifier = Modifier.size(34.dp).shadow(4.dp, CircleShape).clip(CircleShape)
+                    .background(Color.White).clickable { onBack() },
                 contentAlignment = Alignment.Center
             ) {
                 Canvas(Modifier.size(8.dp, 14.dp)) {
-                    val p = Path().apply {
-                        moveTo(size.width, 0f); lineTo(0f, size.height / 2); lineTo(size.width, size.height)
-                    }
-                    drawPath(p, Color(0xFF18182A),
-                        style = Stroke(width = 3.2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
+                    val p = Path().apply { moveTo(size.width, 0f); lineTo(0f, size.height / 2); lineTo(size.width, size.height) }
+                    drawPath(p, Color(0xFF18182A), style = Stroke(width = 3.2f, cap = StrokeCap.Round, join = StrokeJoin.Round))
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text("Complete Payment", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold,
+                Text("Subscription Plans", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold,
                     color = Color(0xFF18182A), letterSpacing = (-0.3).sp)
-                Text("Monthly Premium · ${card.amount}", fontSize = 10.sp,
+                Text("Monthly · Pay in Toman or USD", fontSize = 10.sp,
                     color = Color(0xFFA0AAB8), modifier = Modifier.padding(top = 1.dp))
             }
-            // My receipts
             Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(Color.White)
-                    .clickable { showReceipts = true }
-                    .padding(horizontal = 11.dp, vertical = 7.dp),
-            ) {
-                Text("My Receipts", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF279491))
-            }
+                modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Color.White)
+                    .clickable { showReceipts = true }.padding(horizontal = 11.dp, vertical = 7.dp),
+            ) { Text("My Receipts", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF279491)) }
         }
 
-        // Online gateway — disabled
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(4.dp, RoundedCornerShape(16.dp))
-                .clip(RoundedCornerShape(16.dp))
-                .background(Color.White)
-                .alpha(0.52f)
-                .padding(horizontal = 14.dp, vertical = 12.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(11.dp)
-        ) {
-            Box(
-                modifier = Modifier.size(36.dp).clip(RoundedCornerShape(11.dp)).background(Color(0xFFF0F2F6)),
-                contentAlignment = Alignment.Center
-            ) { Canvas(Modifier.size(18.dp)) { drawGatewayIcon() } }
-            Column(modifier = Modifier.weight(1f)) {
-                Text("Online Payment Gateway", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF6B7A99))
-                Text("Temporarily unavailable", fontSize = 10.sp, color = Color(0xFFA0AAB8),
-                    modifier = Modifier.padding(top = 1.dp))
-            }
-            Box(
-                modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Color(0xFFF0F2F6))
-                    .padding(horizontal = 9.dp, vertical = 3.dp)
-            ) { Text("SOON", fontSize = 9.sp, fontWeight = FontWeight.Bold, color = Color(0xFFA0AAB8), letterSpacing = 0.4.sp) }
-        }
-
-        // OR PAY MANUALLY divider
+        // ---- Plan cards ----
         Row(
             modifier = Modifier.fillMaxWidth(),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(10.dp)
+            horizontalArrangement = Arrangement.spacedBy(9.dp),
         ) {
-            Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFFE2E5EC)))
-            Text("OR PAY MANUALLY", fontSize = 10.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFFA0AAB8))
-            Box(modifier = Modifier.weight(1f).height(1.dp).background(Color(0xFFE2E5EC)))
+            listOf(Plan.PRO, Plan.PREMIUM).forEach { plan ->
+                PlanCard(
+                    plan = plan,
+                    selected = selectedPlan == plan,
+                    modifier = Modifier.weight(1f),
+                    onClick = { selectedPlan = plan },
+                )
+            }
         }
 
-        // Bank card
-        Box(
+        // ---- Currency selector ----
+        Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .shadow(14.dp, RoundedCornerShape(20.dp), spotColor = card.shadow)
-                .clip(RoundedCornerShape(20.dp))
-                .background(Brush.linearGradient(card.gradient, start = Offset(0f, 0f), end = Offset(500f, 400f)))
-                .padding(20.dp)
+                .shadow(3.dp, RoundedCornerShape(14.dp))
+                .clip(RoundedCornerShape(14.dp))
+                .background(Color.White)
+                .padding(horizontal = 14.dp, vertical = 10.dp),
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.SpaceBetween,
         ) {
-            Box(modifier = Modifier.size(140.dp).align(Alignment.TopEnd).offset(x = 34.dp, y = (-34).dp)
-                .clip(CircleShape).border(28.dp, Color.White.copy(alpha = 0.08f), CircleShape))
-            Box(modifier = Modifier.size(90.dp).align(Alignment.BottomStart).offset(x = (-14).dp, y = 28.dp)
-                .clip(CircleShape).border(18.dp, Color.White.copy(alpha = 0.06f), CircleShape))
-
-            Column {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Top
-                ) {
-                    Column {
-                        Text("TRANSFER TO", fontSize = 9.sp, color = Color.White.copy(alpha = 0.55f), letterSpacing = 1.sp)
-                        Text(card.bank, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = Color.White,
-                            letterSpacing = (-0.2).sp, modifier = Modifier.padding(top = 2.dp))
-                    }
-                    CardChip()
-                }
-                Spacer(Modifier.height(20.dp))
-                Text(card.number, fontSize = 17.sp, fontWeight = FontWeight.Medium, color = Color.White,
-                    fontFamily = FontFamily.Monospace, letterSpacing = 3.sp)
-                Spacer(Modifier.height(14.dp))
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.Bottom
-                ) {
-                    Column {
-                        Text("CARD HOLDER", fontSize = 8.5.sp, color = Color.White.copy(alpha = 0.5f),
-                            letterSpacing = 0.8.sp, modifier = Modifier.padding(bottom = 3.dp))
-                        Text(card.holder, fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White,
-                            letterSpacing = 0.3.sp)
-                    }
+            Text("Pay with", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF6B7A99))
+            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                listOf("tmn" to "Toman", "usd" to "USD").forEach { (code, label) ->
+                    val active = selectedCurrency == code
                     Box(
                         modifier = Modifier
-                            .clip(RoundedCornerShape(8.dp))
-                            .background(Color.White.copy(alpha = 0.16f))
-                            .border(1.dp, Color.White.copy(alpha = 0.24f), RoundedCornerShape(8.dp))
-                            .clickable {
-                                clipboard.setText(AnnotatedString(card.number.replace(" ", "")))
-                                copied = true
-                            }
-                            .padding(horizontal = 10.dp, vertical = 5.dp)
+                            .clip(RoundedCornerShape(10.dp))
+                            .background(if (active) Color(0xFF279491) else Color(0xFFF6F7FA))
+                            .border(1.5.dp, if (active) Color(0xFF279491) else Color(0xFFEAECF2), RoundedCornerShape(10.dp))
+                            .clickable { selectedCurrency = code }
+                            .padding(horizontal = 16.dp, vertical = 8.dp),
+                        contentAlignment = Alignment.Center
                     ) {
-                        Text(if (copied) "✓ Copied" else "Copy", fontSize = 9.5.sp,
-                            fontWeight = FontWeight.SemiBold, color = Color.White)
+                        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                            color = if (active) Color.White else Color(0xFF6B7A99))
                     }
                 }
             }
         }
 
-        // Amount badge
+        // ---- Amount badge ----
         Row(
             modifier = Modifier
                 .fillMaxWidth()
@@ -311,11 +232,33 @@ fun PaymentScreen(
                 Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF3DBFBA)))
                 Text("Amount to transfer", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF18182A))
             }
-            Text(card.amount, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF18182A),
-                letterSpacing = (-0.3).sp)
+            Column(horizontalAlignment = Alignment.End) {
+                Text(
+                    if (selectedCurrency == "tmn") "${selectedPlan.tmnPrice} تومان" else selectedPlan.usdPrice,
+                    fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF18182A), letterSpacing = (-0.3).sp
+                )
+                Text(
+                    if (selectedCurrency == "tmn") selectedPlan.usdPrice else "${selectedPlan.tmnPrice} تومان",
+                    fontSize = 10.sp, color = Color(0xFFA0AAB8), modifier = Modifier.padding(top = 1.dp)
+                )
+            }
         }
 
-        // Form
+        // ---- Bank card ----
+        if (selectedCurrency == "usd") {
+            RedotPayCardUI(card = card, copied = copied) {
+                clipboard.setText(AnnotatedString(card.number.replace(" ", "")))
+                copied = true
+            }
+        } else {
+            SamanBankCardUI(card = card, copied = copied) {
+                clipboard.setText(AnnotatedString(card.number.replace(" ", "")))
+                copied = true
+            }
+        }
+
+        // ---- Form ----
         Column(
             modifier = Modifier
                 .fillMaxWidth()
@@ -336,22 +279,6 @@ fun PaymentScreen(
                 placeholder = "XXXX", keyboardType = KeyboardType.Number, mono = true)
             if (triedSubmit && !last4Valid) FieldHint("Enter the last 4 digits of the card")
 
-            // Subscription duration
-            Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
-                Text("Subscription duration", fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
-                    color = Color(0xFF8A96A8), letterSpacing = 0.3.sp)
-                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                    DURATIONS.forEach { opt ->
-                        DurationChip(
-                            label = opt.label,
-                            active = durationDays == opt.days,
-                            modifier = Modifier.weight(1f),
-                            onClick = { durationDays = opt.days },
-                        )
-                    }
-                }
-            }
-
             // Upload receipt
             Column(verticalArrangement = Arrangement.spacedBy(5.dp)) {
                 Text("Upload Receipt", fontSize = 10.sp, fontWeight = FontWeight.SemiBold,
@@ -361,11 +288,9 @@ fun PaymentScreen(
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(11.dp))
                         .background(Color(0xFFF6F7FA))
-                        .border(
-                            1.5.dp,
+                        .border(1.5.dp,
                             if (fileErr != null) Color(0xFFEF4444) else Color(0xFFD0D6E2),
-                            RoundedCornerShape(11.dp),
-                        )
+                            RoundedCornerShape(11.dp))
                         .clickable { picker.launch("*/*") }
                         .padding(14.dp),
                     horizontalAlignment = Alignment.CenterHorizontally,
@@ -376,8 +301,7 @@ fun PaymentScreen(
                         contentAlignment = Alignment.Center
                     ) { Canvas(Modifier.size(16.dp)) { drawUploadIcon() } }
                     Text(picked?.fileName ?: "Tap to upload receipt", fontSize = 11.sp,
-                        fontWeight = FontWeight.SemiBold, color = Color(0xFF8A96A8),
-                        maxLines = 1)
+                        fontWeight = FontWeight.SemiBold, color = Color(0xFF8A96A8), maxLines = 1)
                     Text("JPG, PNG or PDF · max 5MB", fontSize = 9.5.sp, color = Color(0xFFB0BAC8))
                 }
                 if (fileErr != null) FieldHint(fileErr)
@@ -403,7 +327,7 @@ fun PaymentScreen(
                         triedSubmit = true
                         val p = picked
                         if (nameValid && last4Valid && p != null && fileErr == null) {
-                            vm.submit(name, last4, durationDays, p)
+                            vm.submit(name, last4, 30, p)
                         }
                     }
                     .padding(vertical = 13.dp),
@@ -412,8 +336,7 @@ fun PaymentScreen(
                 if (state.submitLoading) {
                     CircularProgressIndicator(modifier = Modifier.size(20.dp), color = Color.White, strokeWidth = 2.dp)
                 } else {
-                    Text("Submit Payment Info",
-                        fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
+                    Text("Submit Payment Info", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold,
                         color = if (canSubmit) Color.White else Color(0xFFA0AAB8))
                 }
             }
@@ -532,18 +455,46 @@ private fun ReceiptRow(label: String, value: String) {
 }
 
 @Composable
-private fun DurationChip(label: String, active: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
+private fun PlanCard(plan: Plan, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
     Box(
         modifier = modifier
-            .clip(RoundedCornerShape(10.dp))
-            .background(if (active) Color(0xFF279491) else Color(0xFFF6F7FA))
-            .border(1.5.dp, if (active) Color(0xFF279491) else Color(0xFFEAECF2), RoundedCornerShape(10.dp))
+            .shadow(if (selected) 6.dp else 2.dp, RoundedCornerShape(16.dp),
+                spotColor = if (selected) Color(0x33279491) else Color(0x10000000))
+            .clip(RoundedCornerShape(16.dp))
+            .background(if (selected) Color(0xFFEFF9F9) else Color.White)
+            .border(2.dp, if (selected) Color(0xFF279491) else Color(0xFFEAECF2), RoundedCornerShape(16.dp))
             .clickable { onClick() }
-            .padding(vertical = 10.dp),
-        contentAlignment = Alignment.Center
+            .padding(14.dp),
     ) {
-        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-            color = if (active) Color.White else Color(0xFF6B7A99))
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Text(plan.label, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF18182A))
+                if (selected) {
+                    Box(
+                        modifier = Modifier.size(18.dp).clip(CircleShape).background(Color(0xFF279491)),
+                        contentAlignment = Alignment.Center
+                    ) { Text("✓", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold) }
+                }
+            }
+            Text(plan.usdPrice, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF279491))
+            Text("${plan.tmnPrice} تومان", fontSize = 11.sp, color = Color(0xFF6B7A99))
+            Box(
+                modifier = Modifier
+                    .clip(RoundedCornerShape(20.dp))
+                    .background(if (plan == Plan.PRO) Color(0x1A279491) else Color(0x1AF59E0B))
+                    .padding(horizontal = 8.dp, vertical = 3.dp)
+            ) {
+                Text(
+                    if (plan == Plan.PRO) "Popular" else "Best Value",
+                    fontSize = 9.sp, fontWeight = FontWeight.Bold,
+                    color = if (plan == Plan.PRO) Color(0xFF279491) else Color(0xFFF59E0B),
+                )
+            }
+        }
     }
 }
 
@@ -566,31 +517,274 @@ private fun NoticeBanner(text: String, color: Color) {
     }
 }
 
-// ---- Card chip ----
+// ---- Saman Bank Card ----
 @Composable
-private fun CardChip() {
+private fun SamanBankCardUI(card: BankCard, copied: Boolean, onCopy: () -> Unit) {
     Box(
         modifier = Modifier
-            .size(32.dp, 24.dp)
-            .clip(RoundedCornerShape(5.dp))
-            .background(Color.White.copy(alpha = 0.22f))
-            .border(1.dp, Color.White.copy(alpha = 0.3f), RoundedCornerShape(5.dp)),
-        contentAlignment = Alignment.Center
+            .fillMaxWidth()
+            .aspectRatio(440f / 277f)
+            .shadow(20.dp, RoundedCornerShape(20.dp), spotColor = Color(0xBB200840))
+            .clip(RoundedCornerShape(20.dp))
     ) {
-        Column(
-            modifier = Modifier.size(18.dp, 14.dp)
-                .clip(RoundedCornerShape(2.dp))
-                .border(1.5.dp, Color.White.copy(alpha = 0.5f), RoundedCornerShape(2.dp))
-                .padding(2.dp),
-            verticalArrangement = Arrangement.spacedBy(1.5.dp)
-        ) {
-            repeat(2) {
-                Row(modifier = Modifier.weight(1f).fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(1.5.dp)) {
-                    repeat(2) {
-                        Box(modifier = Modifier.weight(1f).fillMaxHeight()
-                            .clip(RoundedCornerShape(1.dp)).background(Color.White.copy(alpha = 0.4f)))
-                    }
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width
+            val sc = w / 440f
+
+            drawRect(Brush.linearGradient(
+                listOf(Color(0xFF3C1A52), Color(0xFF27103E), Color(0xFF160826)),
+                Offset.Zero, Offset(w, size.height)
+            ))
+            drawRect(Brush.radialGradient(
+                listOf(Color(0x478040A0), Color(0x008040A0)),
+                Offset(w * .72f, size.height * .20f), w * .50f
+            ))
+            drawRect(Brush.radialGradient(
+                listOf(Color(0x00000000), Color(0x6B000000)),
+                Offset(w / 2f, size.height / 2f), w * .70f
+            ))
+            // Simplified floral dots
+            val fc = Color(0x20D2A220)
+            for (col in 0..5) for (row in 0..3) {
+                val px = (col * 80f + 40f) * sc; val py = (row * 80f + 40f) * sc
+                if (py < size.height) {
+                    drawCircle(fc, 7f * sc, Offset(px, py), style = Stroke(0.8f * sc))
+                    drawCircle(fc.copy(alpha = .07f), 3.5f * sc, Offset(px, py))
+                    drawCircle(fc.copy(alpha = .09f), 3f * sc, Offset(px, py - 12f * sc))
+                    drawCircle(fc.copy(alpha = .09f), 3f * sc, Offset(px, py + 12f * sc))
+                    drawCircle(fc.copy(alpha = .09f), 3f * sc, Offset(px - 12f * sc, py))
+                    drawCircle(fc.copy(alpha = .09f), 3f * sc, Offset(px + 12f * sc, py))
                 }
+            }
+            // Outer gold border
+            drawRoundRect(
+                Brush.linearGradient(listOf(Color(0xFFF8E07A), Color(0xFFD6AA1E), Color(0xFFF4CE48), Color(0xFFBB8A08), Color(0xFFECC030)), Offset.Zero, Offset(w, size.height)),
+                Offset(9f * sc, 9f * sc), androidx.compose.ui.geometry.Size(w - 18f * sc, size.height - 18f * sc),
+                androidx.compose.ui.geometry.CornerRadius(14f * sc), style = Stroke(1.9f * sc)
+            )
+            drawRoundRect(
+                Color(0x42D7AA20), Offset(13.5f * sc, 13.5f * sc),
+                androidx.compose.ui.geometry.Size(w - 27f * sc, size.height - 27f * sc),
+                androidx.compose.ui.geometry.CornerRadius(10f * sc), style = Stroke(.65f * sc)
+            )
+            // EMV Chip (gold)
+            val cx = 32f * sc; val cy = 82f * sc; val cw = 52f * sc; val ch = 40f * sc
+            drawRoundRect(
+                Brush.linearGradient(listOf(Color(0xFFF4D458), Color(0xFFBC8A00), Color(0xFFDEBC28)), Offset(cx, cy), Offset(cx + cw, cy + ch)),
+                Offset(cx, cy), androidx.compose.ui.geometry.Size(cw, ch), androidx.compose.ui.geometry.CornerRadius(5.5f * sc)
+            )
+            drawRoundRect(Color(0xFFA07808), Offset(cx + 2.5f * sc, cy + 2.5f * sc), androidx.compose.ui.geometry.Size(cw - 5f * sc, ch - 5f * sc), androidx.compose.ui.geometry.CornerRadius(4f * sc))
+            drawLine(Color(0xFFC09A10), Offset(cx + 2.5f * sc, cy + ch / 2), Offset(cx + cw - 2.5f * sc, cy + ch / 2), .9f * sc)
+            drawLine(Color(0xFFC09A10), Offset(cx + cw / 2, cy + 2.5f * sc), Offset(cx + cw / 2, cy + ch - 2.5f * sc), .9f * sc)
+            listOf(
+                Offset(cx + 4.5f * sc, cy + 4.5f * sc) to androidx.compose.ui.geometry.Size(19f * sc, 13f * sc),
+                Offset(cx + 28.5f * sc, cy + 4.5f * sc) to androidx.compose.ui.geometry.Size(19f * sc, 13f * sc),
+                Offset(cx + 4.5f * sc, cy + 22.5f * sc) to androidx.compose.ui.geometry.Size(19f * sc, 12f * sc),
+                Offset(cx + 28.5f * sc, cy + 22.5f * sc) to androidx.compose.ui.geometry.Size(19f * sc, 12f * sc),
+            ).forEach { (o, s) -> drawRoundRect(Color(0x99D2A218), o, s, androidx.compose.ui.geometry.CornerRadius(2.5f * sc)) }
+            // Contactless arcs (gold, opening right)
+            val nfcX = 93f * sc; val nfcY = (90f + 12f) * sc
+            val nfcC = Color(0xB3DEB02A)
+            drawCircle(nfcC, 2.4f * sc, Offset(nfcX, nfcY))
+            listOf(7f to 9f, 11f to 15f, 15f to 21f).forEach { (hh, bow) ->
+                drawPath(Path().apply {
+                    moveTo(nfcX, nfcY - hh * sc)
+                    quadraticBezierTo(nfcX + bow * sc, nfcY, nfcX, nfcY + hh * sc)
+                }, nfcC, style = Stroke(1.35f * sc, cap = StrokeCap.Round))
+            }
+        }
+        // Proportional overlay: SVG card is 440×277, positions scaled to actual card size
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val h = maxHeight; val w = maxWidth
+            // SAMAN logo — SVG group at translate(282,20), text "SAMAN" baseline y=48
+            Column(
+                Modifier.align(Alignment.TopEnd).padding(top = h * 0.072f, end = w * 0.055f),
+                horizontalAlignment = Alignment.End
+            ) {
+                Text("SAMAN", fontFamily = FontFamily.Serif, fontSize = 18.sp,
+                    fontWeight = FontWeight.Bold, color = Color(0xF5E6BA2C), letterSpacing = 2.sp)
+                Text("BANK", fontSize = 8.sp, color = Color(0x9ACDA222), letterSpacing = 4.sp)
+            }
+            // Card number — SVG baseline y=180 → top ≈ 163/277 = 58.8%
+            Text(card.number,
+                Modifier.padding(top = h * 0.588f, start = w * 0.073f),
+                fontFamily = FontFamily.Monospace, fontSize = 15.sp,
+                fontWeight = FontWeight.SemiBold, color = Color(0xEEEAC034), letterSpacing = 2.sp
+            )
+            // Cardholder name — SVG baseline y=224 → top ≈ 214/277 = 77.3%
+            Text(card.holder,
+                Modifier.padding(top = h * 0.773f, start = w * 0.073f),
+                fontSize = 11.sp, fontWeight = FontWeight.SemiBold,
+                color = Color(0xDCDCB02C), letterSpacing = 1.5.sp
+            )
+            // Valid THRU — SVG group at y=238 → top ≈ 232/277 = 83.8%
+            Row(
+                Modifier.padding(top = h * 0.838f, start = w * 0.073f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Column {
+                    Text("VALID", fontSize = 6.sp, color = Color(0x7AC8A222))
+                    Text("THRU", fontSize = 6.sp, color = Color(0x7AC8A222))
+                }
+                Text("06/28", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0xD5DEB02C))
+            }
+            // SHETAB — SVG text-anchor end at x=416, y=260 → bottom-right
+            Text("SHETAB",
+                Modifier.align(Alignment.BottomEnd).padding(bottom = 10.dp, end = 12.dp),
+                fontSize = 8.sp, fontWeight = FontWeight.Bold,
+                color = Color(0x8BC8A222), letterSpacing = 1.sp
+            )
+            // Copy button — right side, same vertical as cardholder name
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = h * 0.773f, end = w * 0.04f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0x28DEB02C))
+                    .border(1.dp, Color(0x3FDEB02C), RoundedCornerShape(6.dp))
+                    .clickable(onClick = onCopy)
+                    .padding(horizontal = 9.dp, vertical = 4.dp)
+            ) {
+                Text(if (copied) "✓ Copied" else "Copy", fontSize = 8.5.sp,
+                    fontWeight = FontWeight.SemiBold, color = Color(0xCCDEB02C))
+            }
+        }
+    }
+}
+
+// ---- RedotPay International Card ----
+@Composable
+private fun RedotPayCardUI(card: BankCard, copied: Boolean, onCopy: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .fillMaxWidth()
+            .aspectRatio(440f / 277f)
+            .shadow(18.dp, RoundedCornerShape(20.dp), spotColor = Color(0x66CC1828))
+            .clip(RoundedCornerShape(20.dp))
+    ) {
+        Canvas(Modifier.fillMaxSize()) {
+            val w = size.width
+            val sc = w / 440f
+
+            drawRect(Brush.linearGradient(
+                listOf(Color(0xFF0C0D1E), Color(0xFF10112A), Color(0xFF07080E)),
+                Offset.Zero, Offset(w, size.height)
+            ))
+            // Dot grid
+            val dotC = Color(0x0BFFFFFF)
+            for (col in 0..15) for (row in 0..10) {
+                drawCircle(dotC, .9f * sc, Offset((col * 30f + 15f) * sc, (row * 30f + 15f) * sc))
+                if (col < 15 && row < 10)
+                    drawCircle(dotC, .9f * sc, Offset((col * 30f + 30f) * sc, (row * 30f + 30f) * sc))
+            }
+            drawRect(Brush.radialGradient(listOf(Color(0x3DCC1828), Color(0x00CC1828)), Offset(w * .10f, size.height * .90f), w * .44f))
+            drawRect(Brush.radialGradient(listOf(Color(0x292535C8), Color(0x002535C8)), Offset(w * .85f, size.height * .15f), w * .40f))
+            drawRoundRect(Color(0x12FFFFFF), Offset(1f, 1f),
+                androidx.compose.ui.geometry.Size(w - 2f, size.height - 2f),
+                androidx.compose.ui.geometry.CornerRadius(19f * sc), style = Stroke(1f))
+            // EMV Chip (silver)
+            val cx = 32f * sc; val cy = 82f * sc; val cw = 52f * sc; val ch = 40f * sc
+            drawRoundRect(
+                Brush.linearGradient(listOf(Color(0xFFD6D6DE), Color(0xFF959598), Color(0xFFBCBCC4)), Offset(cx, cy), Offset(cx + cw, cy + ch)),
+                Offset(cx, cy), androidx.compose.ui.geometry.Size(cw, ch), androidx.compose.ui.geometry.CornerRadius(5.5f * sc)
+            )
+            drawRoundRect(Color(0xFF828292), Offset(cx + 2.5f * sc, cy + 2.5f * sc), androidx.compose.ui.geometry.Size(cw - 5f * sc, ch - 5f * sc), androidx.compose.ui.geometry.CornerRadius(4f * sc))
+            drawLine(Color(0xFF9A9AAC), Offset(cx + 2.5f * sc, cy + ch / 2), Offset(cx + cw - 2.5f * sc, cy + ch / 2), .9f * sc)
+            drawLine(Color(0xFF9A9AAC), Offset(cx + cw / 2, cy + 2.5f * sc), Offset(cx + cw / 2, cy + ch - 2.5f * sc), .9f * sc)
+            listOf(
+                Offset(cx + 4.5f * sc, cy + 4.5f * sc) to androidx.compose.ui.geometry.Size(19f * sc, 13f * sc),
+                Offset(cx + 28.5f * sc, cy + 4.5f * sc) to androidx.compose.ui.geometry.Size(19f * sc, 13f * sc),
+                Offset(cx + 4.5f * sc, cy + 22.5f * sc) to androidx.compose.ui.geometry.Size(19f * sc, 12f * sc),
+                Offset(cx + 28.5f * sc, cy + 22.5f * sc) to androidx.compose.ui.geometry.Size(19f * sc, 12f * sc),
+            ).forEach { (o, s) -> drawRoundRect(Color(0x80B4B4C4), o, s, androidx.compose.ui.geometry.CornerRadius(2.5f * sc)) }
+            // Contactless arcs (silver, opening right)
+            val nfcX = 93f * sc; val nfcY = (90f + 12f) * sc
+            val nfcC = Color(0x85B9B9CD)
+            drawCircle(nfcC, 2.4f * sc, Offset(nfcX, nfcY))
+            listOf(7f to 9f, 11f to 15f, 15f to 21f).forEach { (hh, bow) ->
+                drawPath(Path().apply {
+                    moveTo(nfcX, nfcY - hh * sc)
+                    quadraticBezierTo(nfcX + bow * sc, nfcY, nfcX, nfcY + hh * sc)
+                }, nfcC, style = Stroke(1.3f * sc, cap = StrokeCap.Round))
+            }
+        }
+        // Proportional overlay: SVG card is 440×277
+        BoxWithConstraints(Modifier.fillMaxSize()) {
+            val h = maxHeight; val w = maxWidth
+            // RedotPay logo — SVG group at translate(30,24): circle r=15, text alongside
+            Row(
+                Modifier.padding(top = h * 0.087f, start = w * 0.068f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(8.dp)
+            ) {
+                Box(
+                    modifier = Modifier.size(w * 0.068f).clip(CircleShape).background(Color(0xFFC41828)),
+                    contentAlignment = Alignment.Center
+                ) { Text("R", fontSize = 14.sp, fontWeight = FontWeight.Black, color = Color.White) }
+                Column {
+                    Text("Redot", fontSize = 14.sp, fontWeight = FontWeight.Bold,
+                        color = Color(0xE0FFFFFF), letterSpacing = 0.3.sp)
+                    Text("Pay", fontSize = 12.sp, fontWeight = FontWeight.Bold,
+                        color = Color(0xF2D72A3C), letterSpacing = 0.3.sp)
+                }
+            }
+            // NFC icon — SVG at translate(400,28), 40 units from right edge
+            Canvas(
+                Modifier.align(Alignment.TopEnd).padding(top = h * 0.101f, end = w * 0.091f).size(22.dp, 24.dp)
+            ) {
+                val nfcC = Color(0x38FFFFFF)
+                drawCircle(Color(0x1FFFFFFF), 3f, Offset(2f, size.height / 2f))
+                listOf(7f to 9f, 11f to 15f).forEach { (hh, bow) ->
+                    drawPath(Path().apply {
+                        moveTo(4f, size.height / 2f - hh)
+                        quadraticBezierTo(4f + bow, size.height / 2f, 4f, size.height / 2f + hh)
+                    }, nfcC, style = Stroke(1.3f, cap = StrokeCap.Round))
+                }
+            }
+            // Card number — SVG baseline y=180 → top ≈ 58.8%
+            Text(card.number,
+                Modifier.padding(top = h * 0.588f, start = w * 0.073f),
+                fontFamily = FontFamily.Monospace, fontSize = 15.sp,
+                fontWeight = FontWeight.Medium, color = Color(0xDCFFFFFF), letterSpacing = 2.sp
+            )
+            // Cardholder name — SVG baseline y=224 → top ≈ 77.3%
+            Text(card.holder,
+                Modifier.padding(top = h * 0.773f, start = w * 0.073f),
+                fontSize = 11.sp, fontWeight = FontWeight.Medium,
+                color = Color(0x9EFFFFFF), letterSpacing = 1.5.sp
+            )
+            // Valid THRU — SVG group at y=238 → top ≈ 83.8%
+            Row(
+                Modifier.padding(top = h * 0.838f, start = w * 0.073f),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(4.dp)
+            ) {
+                Column {
+                    Text("VALID", fontSize = 6.sp, color = Color(0x4DFFFFFF))
+                    Text("THRU", fontSize = 6.sp, color = Color(0x4DFFFFFF))
+                }
+                Text("09/29", fontSize = 11.sp, fontFamily = FontFamily.Monospace, color = Color(0x94FFFFFF))
+            }
+            // VISA — SVG text-anchor end at x=416, y=260 → bottom-right
+            Text("VISA",
+                Modifier.align(Alignment.BottomEnd).padding(bottom = 10.dp, end = 12.dp),
+                fontSize = 22.sp, fontWeight = FontWeight.Black, fontStyle = FontStyle.Italic,
+                color = Color(0xD6FFFFFF), letterSpacing = (-0.5).sp
+            )
+            // Copy button — right side, same vertical as cardholder name
+            Box(
+                modifier = Modifier
+                    .align(Alignment.TopEnd)
+                    .padding(top = h * 0.773f, end = w * 0.04f)
+                    .clip(RoundedCornerShape(6.dp))
+                    .background(Color(0x22FFFFFF))
+                    .border(1.dp, Color(0x33FFFFFF), RoundedCornerShape(6.dp))
+                    .clickable(onClick = onCopy)
+                    .padding(horizontal = 9.dp, vertical = 4.dp)
+            ) {
+                Text(if (copied) "✓ Copied" else "Copy", fontSize = 8.5.sp,
+                    fontWeight = FontWeight.SemiBold, color = Color(0xCCFFFFFF))
             }
         }
     }
@@ -642,16 +836,6 @@ private fun PayField(
 }
 
 // ---- icons ----
-private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawGatewayIcon() {
-    val c = Color(0xFFA0AAB8); val s = Stroke(1.5f)
-    drawRoundRect(c, topLeft = Offset(size.width * 0.08f, size.height * 0.25f),
-        size = androidx.compose.ui.geometry.Size(size.width * 0.84f, size.height * 0.53f),
-        cornerRadius = androidx.compose.ui.geometry.CornerRadius(5f), style = s)
-    drawLine(c, Offset(size.width * 0.08f, size.height * 0.42f), Offset(size.width * 0.92f, size.height * 0.42f), 1.5f)
-    drawLine(c, Offset(size.width * 0.28f, size.height * 0.61f), Offset(size.width * 0.46f, size.height * 0.61f), 1.5f, cap = StrokeCap.Round)
-    drawCircle(c, radius = size.width * 0.07f, center = Offset(size.width * 0.75f, size.height * 0.61f))
-}
-
 private fun androidx.compose.ui.graphics.drawscope.DrawScope.drawUploadIcon() {
     val c = Color(0xFF8A96A8); val s = Stroke(1.5f, cap = StrokeCap.Round, join = StrokeJoin.Round)
     drawPath(Path().apply {
