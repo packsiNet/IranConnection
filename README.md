@@ -1,7 +1,7 @@
-# IranConnection
+# SafeTunnels
 
-Android (Kotlin + Jetpack Compose) implementation of the **IranConnection** VPN
-app, built from the Claude Design handoff bundle (`IranConnection Home.dc.html`
+Android (Kotlin + Jetpack Compose) implementation of the **SafeTunnels** VPN
+app, built from the Claude Design handoff bundle (`SafeTunnels Home.dc.html`
 and siblings).
 
 The HTML prototypes wrapped every screen in an iPhone mockup (Dynamic Island,
@@ -12,9 +12,9 @@ renders full-screen and uses the real system status / navigation bars.
 
 | Screen | Source prototype | Highlights |
 |--------|------------------|-----------|
-| **Home** (primary) | `IranConnection Home.dc.html` | Live session timer, power toggle (teal ⇄ red), pulsing rings, dotted world map, download/upload stats, Iran server card |
-| **Servers** | `IranConnection All Server.dc.html` | Automatic / Free / Premium sections, live search, connect / disconnect |
-| **Apps** | `IranConnection Apps.dc.html` | Iranian bank apps (2 free, 8 premium scrollable), slide toggles, active count, search |
+| **Home** (primary) | `SafeTunnels Home.dc.html` | Live session timer, power toggle (teal ⇄ red), pulsing rings, dotted world map, download/upload stats, Iran server card |
+| **Servers** | `SafeTunnels All Server.dc.html` | Automatic / Free / Premium sections, live search, connect / disconnect |
+| **Apps** | `SafeTunnels Apps.dc.html` | Iranian bank apps (2 free, 8 premium scrollable), slide toggles, active count, search |
 
 All three share the bottom navigation; tabs switch screens and the connection /
 selection state stays in sync.
@@ -34,7 +34,7 @@ selection state stays in sync.
 ### Source layout
 
 ```
-app/src/main/java/com/iranconnection/app/
+app/src/main/java/com/safetunnels/app/
 ├── MainActivity.kt              # entry point, tab host, edge-to-edge insets
 ├── data/
 │   ├── VpnPreferences.kt        # DataStore wrapper
@@ -64,4 +64,4 @@ Open in Android Studio and Sync, or from the CLI:
 > present in the local Gradle cache, because this build host cannot reach Google's
 > Android Maven repository. On a machine with normal network access you can bump
 > AGP / Kotlin / Compose to current releases freely.
-# IranConnection
+# SafeTunnels

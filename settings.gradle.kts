@@ -13,5 +13,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "IranConnection"
+rootProject.name = "SafeTunnels"
 include(":app")

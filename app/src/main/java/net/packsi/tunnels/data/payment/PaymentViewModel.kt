@@ -1,11 +1,11 @@
-package com.iranconnection.app.data.payment
+package net.packsi.tunnels.data.payment
 
 import android.app.Application
 import android.net.Uri
 import android.provider.OpenableColumns
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.iranconnection.app.data.subscription.HttpFailure
+import net.packsi.tunnels.data.subscription.HttpFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

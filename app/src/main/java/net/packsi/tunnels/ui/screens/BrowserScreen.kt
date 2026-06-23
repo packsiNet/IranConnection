@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.screens
+package net.packsi.tunnels.ui.screens
 
 import android.webkit.WebView
 import androidx.activity.compose.BackHandler
@@ -37,10 +37,10 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.iranconnection.app.data.browser.BrowserViewModel
-import com.iranconnection.app.ui.browser.BrowserAddressBar
-import com.iranconnection.app.ui.browser.BrowserWebView
-import com.iranconnection.app.ui.browser.TabGridScreen
+import net.packsi.tunnels.data.browser.BrowserViewModel
+import net.packsi.tunnels.ui.browser.BrowserAddressBar
+import net.packsi.tunnels.ui.browser.BrowserWebView
+import net.packsi.tunnels.ui.browser.TabGridScreen
 
 @Composable
 fun BrowserScreen(viewModel: BrowserViewModel = viewModel()) {
@@ -131,7 +131,7 @@ fun BrowserScreen(viewModel: BrowserViewModel = viewModel()) {
 /** Single tab's WebView wired to the [BrowserViewModel] callbacks and ref map. */
 @Composable
 private fun TabWebView(
-    tab: com.iranconnection.app.data.browser.BrowserTab,
+    tab: net.packsi.tunnels.data.browser.BrowserTab,
     isActive: Boolean,
     viewModel: BrowserViewModel,
     webViewRefs: androidx.compose.runtime.snapshots.SnapshotStateMap<String, WebView>,
@@ -260,7 +260,7 @@ private fun IntroCard() {
                 Text("IR", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
             }
             Column {
-                Text("IranConnection",
+                Text("SafeTunnels",
                     fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
                 Text("Secure In-App Browser",
                     fontSize = 10.5.sp, color = Color.White.copy(alpha = 0.6f),

@@ -1,8 +1,8 @@
-package com.iranconnection.app.data
+package net.packsi.tunnels.data
 
 import android.content.Context
 import android.content.Intent
-import com.iranconnection.app.IranVpnService
+import net.packsi.tunnels.IranVpnService
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import com.wireguard.config.Config

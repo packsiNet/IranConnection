@@ -1,4 +1,4 @@
-package com.iranconnection.app.data
+package net.packsi.tunnels.data
 
 import com.google.gson.Gson
 import kotlinx.coroutines.Dispatchers

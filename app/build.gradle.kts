@@ -6,11 +6,11 @@ plugins {
 }
 
 android {
-    namespace = "com.iranconnection.app"
+    namespace = "net.packsi.tunnels"
     compileSdk = 34
 
     defaultConfig {
-        applicationId = "com.iranconnection.app"
+        applicationId = "net.packsi.tunnels"
         minSdk = 24
         targetSdk = 34
         versionCode = 1

@@ -1,4 +1,4 @@
-package com.iranconnection.app.data
+package net.packsi.tunnels.data
 
 import android.content.Context
 import androidx.datastore.preferences.core.booleanPreferencesKey

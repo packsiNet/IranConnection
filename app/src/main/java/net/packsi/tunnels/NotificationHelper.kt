@@ -1,4 +1,4 @@
-package com.iranconnection.app
+package net.packsi.tunnels
 
 import android.app.Notification
 import android.app.NotificationChannel

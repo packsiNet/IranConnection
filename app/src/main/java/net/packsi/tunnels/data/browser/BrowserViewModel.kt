@@ -1,4 +1,4 @@
-package com.iranconnection.app.data.browser
+package net.packsi.tunnels.data.browser
 
 import android.net.Uri
 import androidx.lifecycle.ViewModel

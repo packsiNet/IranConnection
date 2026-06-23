@@ -1,4 +1,4 @@
-package com.iranconnection.app.data.browser
+package net.packsi.tunnels.data.browser
 
 import android.graphics.Bitmap
 import java.util.UUID

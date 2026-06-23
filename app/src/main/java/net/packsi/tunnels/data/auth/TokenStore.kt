@@ -1,4 +1,4 @@
-package com.iranconnection.app.data.auth
+package net.packsi.tunnels.data.auth
 
 import android.content.Context
 import android.content.SharedPreferences

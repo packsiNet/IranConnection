@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.screens
+package net.packsi.tunnels.ui.screens
 
 import android.net.Uri
 import androidx.activity.compose.BackHandler
@@ -41,9 +41,9 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.iranconnection.app.data.payment.PaymentViewModel
-import com.iranconnection.app.data.payment.PickedReceipt
-import com.iranconnection.app.data.payment.ReceiptResponse
+import net.packsi.tunnels.data.payment.PaymentViewModel
+import net.packsi.tunnels.data.payment.PickedReceipt
+import net.packsi.tunnels.data.payment.ReceiptResponse
 import kotlinx.coroutines.delay
 
 // ---- Bank card data per currency (destination card + amount live in the frontend, not the API) ----

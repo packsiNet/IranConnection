@@ -1,8 +1,8 @@
-package com.iranconnection.app.data.payment
+package net.packsi.tunnels.data.payment
 
-import com.iranconnection.app.data.auth.ApiClient
-import com.iranconnection.app.data.auth.ErrorResponse
-import com.iranconnection.app.data.subscription.HttpFailure
+import net.packsi.tunnels.data.auth.ApiClient
+import net.packsi.tunnels.data.auth.ErrorResponse
+import net.packsi.tunnels.data.subscription.HttpFailure
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaTypeOrNull

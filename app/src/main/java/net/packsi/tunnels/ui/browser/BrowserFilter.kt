@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.browser
+package net.packsi.tunnels.ui.browser
 
 import android.net.Uri
 import android.webkit.WebResourceResponse

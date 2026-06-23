@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.components
+package net.packsi.tunnels.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.Box

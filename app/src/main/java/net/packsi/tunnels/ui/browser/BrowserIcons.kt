@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.browser
+package net.packsi.tunnels.ui.browser
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size

@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.screens
+package net.packsi.tunnels.ui.screens
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.Animatable
@@ -46,9 +46,9 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.runtime.collectAsState
 import androidx.core.graphics.drawable.toBitmap
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.iranconnection.app.data.AppsViewModel
-import com.iranconnection.app.data.IranianAppInfo
-import com.iranconnection.app.ui.theme.AppColors
+import net.packsi.tunnels.data.AppsViewModel
+import net.packsi.tunnels.data.IranianAppInfo
+import net.packsi.tunnels.ui.theme.AppColors
 
 /** Flat list entry types so the whole screen renders through real LazyColumn items (lazy, virtualized). */
 private sealed interface AppEntry {

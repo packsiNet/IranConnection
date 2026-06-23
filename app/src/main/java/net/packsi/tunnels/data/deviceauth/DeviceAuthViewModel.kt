@@ -1,9 +1,9 @@
-package com.iranconnection.app.data.deviceauth
+package net.packsi.tunnels.data.deviceauth
 
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
-import com.iranconnection.app.utils.DeviceIdHelper
+import net.packsi.tunnels.utils.DeviceIdHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow

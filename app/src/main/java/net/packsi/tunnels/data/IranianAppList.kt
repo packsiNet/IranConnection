@@ -1,6 +1,6 @@
-package com.iranconnection.app.data
+package net.packsi.tunnels.data
 
-import com.iranconnection.app.data.subscription.CatalogApp
+import net.packsi.tunnels.data.subscription.CatalogApp
 
 object IranianAppList {
 

@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.screens
+package net.packsi.tunnels.ui.screens
 
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
@@ -62,12 +62,12 @@ import androidx.compose.ui.unit.sp
 import androidx.compose.ui.window.Dialog
 import androidx.compose.ui.window.DialogProperties
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.iranconnection.app.ConfigFetchStatus
-import com.iranconnection.app.data.auth.AuthViewModel
-import com.iranconnection.app.ui.components.CountryFlag
-import com.iranconnection.app.ui.components.SignalBars
-import com.iranconnection.app.ui.components.WorldMap
-import com.iranconnection.app.ui.theme.AppColors
+import net.packsi.tunnels.ConfigFetchStatus
+import net.packsi.tunnels.data.auth.AuthViewModel
+import net.packsi.tunnels.ui.components.CountryFlag
+import net.packsi.tunnels.ui.components.SignalBars
+import net.packsi.tunnels.ui.components.WorldMap
+import net.packsi.tunnels.ui.theme.AppColors
 
 @Composable
 fun HomeScreen(
@@ -412,7 +412,7 @@ private fun ServerCard(connected: Boolean, serverIp: String?, onClick: () -> Uni
         horizontalArrangement = Arrangement.spacedBy(12.dp),
     ) {
         androidx.compose.foundation.Image(
-            painter = androidx.compose.ui.res.painterResource(com.iranconnection.app.R.drawable.ic_iran_flag),
+            painter = androidx.compose.ui.res.painterResource(net.packsi.tunnels.R.drawable.ic_iran_flag),
             contentDescription = "Iran",
             modifier = Modifier.size(42.dp).clip(CircleShape),
         )

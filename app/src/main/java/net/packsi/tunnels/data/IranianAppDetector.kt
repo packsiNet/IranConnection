@@ -1,8 +1,8 @@
-package com.iranconnection.app.data
+package net.packsi.tunnels.data
 
 import android.content.Context
 import android.content.pm.PackageManager
-import com.iranconnection.app.data.subscription.CatalogApp
+import net.packsi.tunnels.data.subscription.CatalogApp
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 

@@ -1,11 +1,11 @@
-package com.iranconnection.app.data.auth
+package net.packsi.tunnels.data.auth
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
-import com.iranconnection.app.data.subscription.HttpFailure
-import com.iranconnection.app.data.subscription.SubscriptionRepository
-import com.iranconnection.app.data.subscription.SubscriptionResponse
+import net.packsi.tunnels.data.subscription.HttpFailure
+import net.packsi.tunnels.data.subscription.SubscriptionRepository
+import net.packsi.tunnels.data.subscription.SubscriptionResponse
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.asStateFlow

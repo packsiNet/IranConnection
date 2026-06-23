@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.components
+package net.packsi.tunnels.ui.components
 
 import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.layout.size
@@ -9,7 +9,7 @@ import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.unit.dp
-import com.iranconnection.app.ui.theme.AppColors
+import net.packsi.tunnels.ui.theme.AppColors
 
 /** 3-bar signal strength, teal for active bars, grey for the rest. */
 @Composable

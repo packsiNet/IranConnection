@@ -1,6 +1,6 @@
-package com.iranconnection.app.data.deviceauth
+package net.packsi.tunnels.data.deviceauth
 
-import com.iranconnection.app.data.auth.AuthResponse
+import net.packsi.tunnels.data.auth.AuthResponse
 
 data class DeviceLoginRequest(
     val deviceId: String,

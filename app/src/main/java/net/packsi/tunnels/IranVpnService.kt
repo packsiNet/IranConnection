@@ -1,4 +1,4 @@
-package com.iranconnection.app
+package net.packsi.tunnels
 
 import android.content.Context
 import android.content.Intent
@@ -6,8 +6,8 @@ import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.ServiceCompat
-import com.iranconnection.app.data.ConnectionLog
-import com.iranconnection.app.data.WireGuardManager
+import net.packsi.tunnels.data.ConnectionLog
+import net.packsi.tunnels.data.WireGuardManager
 import com.wireguard.android.backend.GoBackend
 import com.wireguard.android.backend.Tunnel
 import kotlinx.coroutines.CoroutineScope

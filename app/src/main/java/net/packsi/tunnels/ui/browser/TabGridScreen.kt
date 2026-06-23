@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.browser
+package net.packsi.tunnels.ui.browser
 
 import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
@@ -30,7 +30,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.iranconnection.app.data.browser.BrowserTab
+import net.packsi.tunnels.data.browser.BrowserTab
 
 @Composable
 fun TabGridScreen(

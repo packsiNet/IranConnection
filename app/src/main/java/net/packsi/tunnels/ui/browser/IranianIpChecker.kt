@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.browser
+package net.packsi.tunnels.ui.browser
 
 import java.net.InetAddress
 import java.util.concurrent.ConcurrentHashMap

@@ -1,4 +1,4 @@
-package com.iranconnection.app
+package net.packsi.tunnels
 
 import android.app.Activity
 import android.net.VpnService
@@ -26,24 +26,24 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.iranconnection.app.data.VpnStatus
-import com.iranconnection.app.data.VpnViewModel
-import com.iranconnection.app.data.auth.ApiClient
-import com.iranconnection.app.data.deviceauth.AppStartState
-import com.iranconnection.app.data.deviceauth.DeviceAuthViewModel
-import com.iranconnection.app.data.UpdateInfo
-import com.iranconnection.app.data.UpdateManager
-import com.iranconnection.app.ui.components.AppBottomNav
-import com.iranconnection.app.ui.components.NavTab
-import com.iranconnection.app.ui.components.UpdateDialog
-import com.iranconnection.app.ui.screens.AppsScreen
-import com.iranconnection.app.ui.screens.BrowserScreen
-import com.iranconnection.app.ui.screens.HomeScreen
-import com.iranconnection.app.ui.screens.LogScreen
-import com.iranconnection.app.ui.screens.ProfileScreen
-import com.iranconnection.app.ui.screens.SplashScreen
-import com.iranconnection.app.ui.theme.AppColors
-import com.iranconnection.app.ui.theme.IranConnectionTheme
+import net.packsi.tunnels.data.VpnStatus
+import net.packsi.tunnels.data.VpnViewModel
+import net.packsi.tunnels.data.auth.ApiClient
+import net.packsi.tunnels.data.deviceauth.AppStartState
+import net.packsi.tunnels.data.deviceauth.DeviceAuthViewModel
+import net.packsi.tunnels.data.UpdateInfo
+import net.packsi.tunnels.data.UpdateManager
+import net.packsi.tunnels.ui.components.AppBottomNav
+import net.packsi.tunnels.ui.components.NavTab
+import net.packsi.tunnels.ui.components.UpdateDialog
+import net.packsi.tunnels.ui.screens.AppsScreen
+import net.packsi.tunnels.ui.screens.BrowserScreen
+import net.packsi.tunnels.ui.screens.HomeScreen
+import net.packsi.tunnels.ui.screens.LogScreen
+import net.packsi.tunnels.ui.screens.ProfileScreen
+import net.packsi.tunnels.ui.screens.SplashScreen
+import net.packsi.tunnels.ui.theme.AppColors
+import net.packsi.tunnels.ui.theme.SafeTunnelsTheme
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.ui.unit.dp
 
@@ -59,7 +59,7 @@ class MainActivity : ComponentActivity() {
         ApiClient.init(applicationContext)
 
         setContent {
-            IranConnectionTheme {
+            SafeTunnelsTheme {
                 val authViewModel: DeviceAuthViewModel = viewModel(
                     factory = object : ViewModelProvider.Factory {
                         @Suppress("UNCHECKED_CAST")

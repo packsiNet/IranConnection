@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.screens
+package net.packsi.tunnels.ui.screens
 
 import androidx.activity.compose.BackHandler
 import androidx.compose.animation.core.*
@@ -22,9 +22,9 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.*
 import androidx.lifecycle.viewmodel.compose.viewModel
-import com.iranconnection.app.data.auth.AuthViewModel
-import com.iranconnection.app.data.auth.UserProfile
-import com.iranconnection.app.data.subscription.SubscriptionResponse
+import net.packsi.tunnels.data.auth.AuthViewModel
+import net.packsi.tunnels.data.auth.UserProfile
+import net.packsi.tunnels.data.subscription.SubscriptionResponse
 
 // ---- Color palette (Profile-screen specific) ----
 private val TealStart   = Color(0xFF3DBFBA)

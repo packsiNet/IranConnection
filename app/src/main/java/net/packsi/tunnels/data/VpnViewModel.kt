@@ -1,4 +1,4 @@
-package com.iranconnection.app.data
+package net.packsi.tunnels.data
 
 import android.app.Application
 import androidx.lifecycle.AndroidViewModel

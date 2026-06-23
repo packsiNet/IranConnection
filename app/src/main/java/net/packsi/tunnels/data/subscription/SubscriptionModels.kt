@@ -1,4 +1,4 @@
-package com.iranconnection.app.data.subscription
+package net.packsi.tunnels.data.subscription
 
 /**
  * GET /api/subscription — per-user subscription status only (no app list).

@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.browser
+package net.packsi.tunnels.ui.browser
 
 import android.annotation.SuppressLint
 import android.graphics.Bitmap
@@ -12,7 +12,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.remember
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.viewinterop.AndroidView
-import com.iranconnection.app.data.browser.BrowserTab
+import net.packsi.tunnels.data.browser.BrowserTab
 
 /**
  * One WebView per tab. All tabs stay alive in the composition; only the active

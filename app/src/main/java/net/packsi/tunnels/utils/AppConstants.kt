@@ -1,6 +1,6 @@
-package com.iranconnection.app.utils
+package net.packsi.tunnels.utils
 
-import com.iranconnection.app.BuildConfig
+import net.packsi.tunnels.BuildConfig
 
 object AppConstants {
     const val VERSION_CODE = 1

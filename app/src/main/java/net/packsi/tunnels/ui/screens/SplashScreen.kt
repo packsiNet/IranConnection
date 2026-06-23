@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.screens
+package net.packsi.tunnels.ui.screens
 
 import androidx.compose.animation.core.*
 import androidx.compose.foundation.*
@@ -109,7 +109,7 @@ private fun LogoSection() {
     ) {
         LogoWithRipple()
         Column(horizontalAlignment = Alignment.CenterHorizontally) {
-            Text("IranConnection", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextHigh, letterSpacing = (-0.5).sp)
+            Text("SafeTunnels", fontSize = 20.sp, fontWeight = FontWeight.ExtraBold, color = TextHigh, letterSpacing = (-0.5).sp)
             Spacer(Modifier.height(4.dp))
             Text("Secure · Fast · Reliable", fontSize = 11.sp, color = TextLow, letterSpacing = 0.5.sp)
         }

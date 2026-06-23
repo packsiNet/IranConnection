@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.components
+package net.packsi.tunnels.ui.components
 
 import android.content.Intent
 import android.net.Uri
@@ -76,7 +76,7 @@ fun UpdateDialog(
                         )
                     }
                     Text(
-                        "IranConnection",
+                        "SafeTunnels",
                         fontSize = 18.sp,
                         fontWeight = FontWeight.Bold,
                         color = Color.White,

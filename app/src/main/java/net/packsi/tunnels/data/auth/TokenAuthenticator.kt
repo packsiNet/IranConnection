@@ -1,4 +1,4 @@
-package com.iranconnection.app.data.auth
+package net.packsi.tunnels.data.auth
 
 import kotlinx.coroutines.runBlocking
 import okhttp3.Authenticator

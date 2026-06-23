@@ -1,8 +1,8 @@
-package com.iranconnection.app.ui.theme
+package net.packsi.tunnels.ui.theme
 
 import androidx.compose.ui.graphics.Color
 
-// Brand palette extracted from the IranConnection design (dc.html sources)
+// Brand palette extracted from the SafeTunnels design (dc.html sources)
 object AppColors {
     val ScreenBg = Color(0xFFF1F3F7)
     val CardBg = Color(0xFFFFFFFF)

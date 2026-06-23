@@ -1,7 +1,7 @@
-package com.iranconnection.app.data.subscription
+package net.packsi.tunnels.data.subscription
 
-import com.iranconnection.app.data.auth.ApiClient
-import com.iranconnection.app.data.auth.ErrorResponse
+import net.packsi.tunnels.data.auth.ApiClient
+import net.packsi.tunnels.data.auth.ErrorResponse
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import retrofit2.Response

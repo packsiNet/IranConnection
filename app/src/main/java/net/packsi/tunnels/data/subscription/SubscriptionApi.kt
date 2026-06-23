@@ -1,4 +1,4 @@
-package com.iranconnection.app.data.subscription
+package net.packsi.tunnels.data.subscription
 
 import retrofit2.Response
 import retrofit2.http.GET

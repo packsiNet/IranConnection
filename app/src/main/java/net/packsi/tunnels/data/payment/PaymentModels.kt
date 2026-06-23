@@ -1,4 +1,4 @@
-package com.iranconnection.app.data.payment
+package net.packsi.tunnels.data.payment
 
 /**
  * One entry of GET /api/payment/receipts.

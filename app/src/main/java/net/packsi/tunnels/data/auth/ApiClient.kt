@@ -1,10 +1,10 @@
-package com.iranconnection.app.data.auth
+package net.packsi.tunnels.data.auth
 
 import android.content.Context
 import com.google.gson.Gson
-import com.iranconnection.app.BuildConfig
-import com.iranconnection.app.data.payment.PaymentApi
-import com.iranconnection.app.data.subscription.SubscriptionApi
+import net.packsi.tunnels.BuildConfig
+import net.packsi.tunnels.data.payment.PaymentApi
+import net.packsi.tunnels.data.subscription.SubscriptionApi
 import okhttp3.OkHttpClient
 import retrofit2.Retrofit
 import retrofit2.converter.gson.GsonConverterFactory

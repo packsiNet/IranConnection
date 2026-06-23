@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.screens
+package net.packsi.tunnels.ui.screens
 
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -32,9 +32,9 @@ import androidx.compose.ui.text.TextStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.iranconnection.app.ui.components.CountryFlag
-import com.iranconnection.app.ui.components.SignalBars
-import com.iranconnection.app.ui.theme.AppColors
+import net.packsi.tunnels.ui.components.CountryFlag
+import net.packsi.tunnels.ui.components.SignalBars
+import net.packsi.tunnels.ui.theme.AppColors
 
 data class Server(
     val id: String,

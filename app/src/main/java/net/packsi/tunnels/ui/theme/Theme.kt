@@ -1,4 +1,4 @@
-package com.iranconnection.app.ui.theme
+package net.packsi.tunnels.ui.theme
 
 import androidx.compose.foundation.isSystemInDarkTheme
 import androidx.compose.material3.MaterialTheme
@@ -26,7 +26,7 @@ private val AppTypography = Typography(
 )
 
 @Composable
-fun IranConnectionTheme(
+fun SafeTunnelsTheme(
     darkTheme: Boolean = isSystemInDarkTheme(),
     content: @Composable () -> Unit,
 ) {

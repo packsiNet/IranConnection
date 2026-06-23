@@ -1,10 +1,10 @@
-package com.iranconnection.app.data.deviceauth
+package net.packsi.tunnels.data.deviceauth
 
 import android.content.Context
 import com.google.gson.Gson
-import com.iranconnection.app.data.auth.AuthResponse
-import com.iranconnection.app.data.auth.TokenStore
-import com.iranconnection.app.utils.AppConstants
+import net.packsi.tunnels.data.auth.AuthResponse
+import net.packsi.tunnels.data.auth.TokenStore
+import net.packsi.tunnels.utils.AppConstants
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 import okhttp3.MediaType.Companion.toMediaType

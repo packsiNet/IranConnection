@@ -78,7 +78,7 @@
         android:label="@string/app_name"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
-        android:theme="@style/Theme.IranConnection">
+        android:theme="@style/Theme.SafeTunnels">
 
         <service
             android:name=".IranVpnService"
@@ -94,7 +94,7 @@
             android:name=".MainActivity"
             android:exported="true"
             android:windowSoftInputMode="adjustResize"
-            android:theme="@style/Theme.IranConnection">
+            android:theme="@style/Theme.SafeTunnels">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

@@ -1,4 +1,4 @@
-package com.iranconnection.app.data
+package net.packsi.tunnels.data
 
 data class IranianApp(
     val packageName: String,

@@ -1,4 +1,4 @@
-package com.iranconnection.app.utils
+package net.packsi.tunnels.utils
 
 import android.content.Context
 import android.os.Build
