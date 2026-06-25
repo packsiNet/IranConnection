@@ -26,7 +26,7 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import net.packsi.tunnels.ui.theme.AppColors
 
-enum class NavTab { HOME, APPS, BROWSER, PROFILE }
+enum class NavTab { HOME, APPS, PROFILE }
 
 @Composable
 fun AppBottomNav(
@@ -51,10 +51,7 @@ fun AppBottomNav(
             NavItem("Apps", selected == NavTab.APPS, onClick = { onSelect(NavTab.APPS) }) { color ->
                 AppsIcon(color)
             }
-            NavItem("browser", selected == NavTab.BROWSER, onClick = { onSelect(NavTab.BROWSER) }) { color ->
-                GlobeIcon(color)
-            }
-            NavItem("Profile", selected == NavTab.PROFILE, onClick = { onSelect(NavTab.PROFILE) }) { color ->
+NavItem("Profile", selected == NavTab.PROFILE, onClick = { onSelect(NavTab.PROFILE) }) { color ->
                 ProfileIcon(color)
             }
         }

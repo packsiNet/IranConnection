@@ -3,6 +3,7 @@ package net.packsi.tunnels.ui.screens
 import androidx.compose.animation.animateColorAsState
 import androidx.compose.animation.core.FastOutSlowInEasing
 import androidx.compose.animation.core.RepeatMode
+import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloat
 import androidx.compose.animation.core.infiniteRepeatable
 import androidx.compose.animation.core.rememberInfiniteTransition
@@ -24,9 +25,8 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.border
-import androidx.compose.foundation.rememberScrollState
-import androidx.compose.foundation.verticalScroll
 import androidx.compose.foundation.layout.offset
+import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.widthIn
 import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.material3.DropdownMenu
@@ -52,9 +52,7 @@ import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.graphics.StrokeCap
 import androidx.compose.ui.graphics.drawscope.Stroke
-import androidx.compose.ui.platform.LocalClipboardManager
-import androidx.compose.ui.text.AnnotatedString
-import androidx.compose.ui.text.font.FontFamily
+import androidx.compose.ui.graphics.drawscope.rotate
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
@@ -79,8 +77,12 @@ fun HomeScreen(
     onServerCardClick: () -> Unit,
     onShowLogs: () -> Unit = {},
     onGoToLogin: () -> Unit = {},
+    onGoToPayment: () -> Unit = {},
     configStatus: ConfigFetchStatus = ConfigFetchStatus.Success,
     buttonEnabled: Boolean = true,
+    errorMessage: String? = null,
+    browserVpnEnabled: Boolean = false,
+    onBrowserVpnChange: (Boolean) -> Unit = {},
 ) {
     val accent by animateColorAsState(if (connected) AppColors.Teal else AppColors.Red, label = "accent")
 
@@ -105,19 +107,32 @@ fun HomeScreen(
         )
 
         // Connection status
-        Row(
+        Column(
             Modifier.fillMaxWidth().padding(top = 18.dp, bottom = 6.dp),
-            horizontalArrangement = Arrangement.Center,
-            verticalAlignment = Alignment.CenterVertically,
+            horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-            StatusDot(connected, accent)
-            Spacer(Modifier.size(7.dp))
-            Text(
-                statusLabel,
-                fontSize = 13.sp,
-                fontWeight = FontWeight.SemiBold,
-                color = accent,
-            )
+            Row(
+                horizontalArrangement = Arrangement.Center,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                StatusDot(connected, accent)
+                Spacer(Modifier.size(7.dp))
+                Text(
+                    statusLabel,
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = accent,
+                )
+            }
+            if (errorMessage != null) {
+                Text(
+                    errorMessage,
+                    fontSize = 11.sp,
+                    color = AppColors.Red,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.padding(horizontal = 28.dp, vertical = 3.dp),
+                )
+            }
         }
 
         // Timer
@@ -153,6 +168,7 @@ fun HomeScreen(
             PowerButton(connected, accent, buttonEnabled, onToggle)
         }
 
+        BrowserToggleRow(enabled = browserVpnEnabled, connected = connected, onChange = onBrowserVpnChange)
         ServerCard(connected = connected, serverIp = serverIp, onClick = onServerCardClick)
         Spacer(Modifier.height(12.dp))
     }
@@ -160,7 +176,7 @@ fun HomeScreen(
     if (showPremiumModal) {
         PremiumModal(
             onDismiss = { showPremiumModal = false },
-            onGoToLogin = { showPremiumModal = false; onGoToLogin() },
+            onGoToPayment = { showPremiumModal = false; onGoToPayment() },
         )
     }
 }
@@ -398,6 +414,109 @@ private fun PowerButton(connected: Boolean, accent: Color, enabled: Boolean, onT
 }
 
 @Composable
+private fun BrowserToggleRow(enabled: Boolean, connected: Boolean, onChange: (Boolean) -> Unit) {
+    val trackColor by animateColorAsState(
+        targetValue = if (enabled) AppColors.Teal else Color(0xFF9494A8),
+        animationSpec = tween(220),
+        label = "track",
+    )
+    val thumbX by animateDpAsState(
+        targetValue = if (enabled) 24.dp else 2.dp,
+        animationSpec = tween(220),
+        label = "thumb",
+    )
+    val iconColor = if (enabled) AppColors.Teal else Color(0xFF8888A0)
+
+    Row(
+        Modifier
+            .fillMaxWidth()
+            .padding(horizontal = 18.dp)
+            .padding(bottom = 10.dp)
+            .alpha(if (connected) 1f else 0.45f)
+            .shadow(6.dp, RoundedCornerShape(16.dp))
+            .background(AppColors.CardBg, RoundedCornerShape(16.dp))
+            .then(
+                if (connected) Modifier.clickable(
+                    interactionSource = remember { MutableInteractionSource() },
+                    indication = null,
+                ) { onChange(!enabled) } else Modifier
+            )
+            .padding(horizontal = 14.dp, vertical = 11.dp),
+        verticalAlignment = Alignment.CenterVertically,
+        horizontalArrangement = Arrangement.SpaceBetween,
+    ) {
+        Row(
+            verticalAlignment = Alignment.CenterVertically,
+            horizontalArrangement = Arrangement.spacedBy(10.dp),
+        ) {
+            Box(
+                Modifier
+                    .size(36.dp)
+                    .clip(RoundedCornerShape(10.dp))
+                    .background(if (enabled) AppColors.Teal.copy(alpha = 0.14f) else Color(0xFF2A2A3C)),
+                contentAlignment = Alignment.Center,
+            ) {
+                Canvas(Modifier.size(20.dp)) {
+                    val cx = size.width / 2f
+                    val cy = size.height / 2f
+                    val er = size.width * 0.35f
+                    val sw = 1.7.dp.toPx()
+                    // "e" body arc
+                    drawArc(
+                        color = iconColor,
+                        startAngle = 35f,
+                        sweepAngle = 290f,
+                        useCenter = false,
+                        topLeft = Offset(cx - er, cy - er),
+                        size = Size(er * 2f, er * 2f),
+                        style = Stroke(width = sw, cap = StrokeCap.Round),
+                    )
+                    // "e" horizontal bar
+                    drawLine(iconColor, Offset(cx - er * 0.9f, cy), Offset(cx + er * 0.7f, cy), sw, StrokeCap.Round)
+                    // orbital ring (rotated ellipse)
+                    rotate(-35f) {
+                        drawOval(
+                            color = iconColor,
+                            topLeft = Offset(cx - er * 1.38f, cy - er * 0.45f),
+                            size = Size(er * 2.76f, er * 0.9f),
+                            style = Stroke(width = sw * 0.75f),
+                        )
+                    }
+                }
+            }
+            Column {
+                Text(
+                    "Should browsers use tunneling?",
+                    fontSize = 13.sp,
+                    fontWeight = FontWeight.SemiBold,
+                    color = AppColors.TextPrimary,
+                )
+                Text(
+                    "Chrome · Firefox · Edge · Brave",
+                    fontSize = 11.sp,
+                    color = AppColors.TextMuted,
+                )
+            }
+        }
+        Box(
+            Modifier
+                .width(52.dp)
+                .height(30.dp)
+                .clip(RoundedCornerShape(15.dp))
+                .background(trackColor),
+        ) {
+            Box(
+                Modifier
+                    .offset(x = thumbX, y = 2.dp)
+                    .size(26.dp)
+                    .clip(CircleShape)
+                    .background(Color.White),
+            )
+        }
+    }
+}
+
+@Composable
 private fun ServerCard(connected: Boolean, serverIp: String?, onClick: () -> Unit) {
     Row(
         Modifier
@@ -508,251 +627,107 @@ private fun formatTime(seconds: Long): String {
 // =====================================================================
 // Premium upsell modal (opened from the Home "Premium" badge)
 // =====================================================================
-private data class PremiumCard(
-    val bank: String,
-    val number: String,
-    val holder: String,
-    val amount: String,
-    val gradient: List<Color>,
-    val shadow: Color,
-)
-
-private val PREMIUM_USD = PremiumCard(
-    bank = "USD Bank",
-    number = "4937 2420 2574 6817",
-    holder = "LALEH MANSOURI",
-    amount = "$2.50 USD",
-    gradient = listOf(Color(0xFFE63950), Color(0xFFB01030), Color(0xFF7A0C24)),
-    shadow = Color(0x5CC81838),
-)
-private val PREMIUM_TMN = PremiumCard(
-    bank = "Iranian Bank",
-    number = "6219 8618 0150 9695",
-    holder = "SHAHRAM OVEISI",
-    amount = "300,000 TMN",
-    gradient = listOf(Color(0xFF2D8FD8), Color(0xFF1868B2), Color(0xFF0C3D78)),
-    shadow = Color(0x5C1878C8),
-)
-
 @Composable
-private fun PremiumModal(onDismiss: () -> Unit, onGoToLogin: () -> Unit) {
-    val clipboard = LocalClipboardManager.current
-    var currency by remember { mutableStateOf("usd") }
-    var copied by remember { mutableStateOf(false) }
-    val card = if (currency == "usd") PREMIUM_USD else PREMIUM_TMN
-
-    LaunchedEffect(copied) {
-        if (copied) { kotlinx.coroutines.delay(2000); copied = false }
-    }
-
+private fun PremiumModal(onDismiss: () -> Unit, onGoToPayment: () -> Unit) {
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 18.dp)
-                .widthIn(max = 420.dp)
-                .clip(RoundedCornerShape(26.dp))
-                .background(Color(0xFFF4F6FA))
-                .verticalScroll(rememberScrollState()),
+                .padding(horizontal = 20.dp)
+                .widthIn(max = 400.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xFFF4F6FA)),
         ) {
-            // Gradient hero header
+            // Header
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .background(
                         Brush.linearGradient(
                             listOf(Color(0xFFFBCF42), Color(0xFFF5A620), Color(0xFFE48808)),
-                            start = Offset(0f, 0f), end = Offset(600f, 300f),
+                            start = Offset(0f, 0f), end = Offset(600f, 200f),
                         ),
                     )
-                    .padding(horizontal = 20.dp, vertical = 20.dp),
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
             ) {
-                // close
                 Box(
                     modifier = Modifier
                         .align(Alignment.TopEnd)
-                        .size(28.dp)
+                        .size(26.dp)
                         .clip(CircleShape)
                         .background(Color.White.copy(alpha = 0.25f))
                         .clickable { onDismiss() },
                     contentAlignment = Alignment.Center,
-                ) { Text("✕", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color.White) }
+                ) { Text("✕", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White) }
 
                 Column {
-                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                        Canvas(Modifier.size(24.dp, 19.dp)) {
-                            val w = size.width / 20f; val h = size.height / 16f
-                            val p = androidx.compose.ui.graphics.Path().apply {
-                                moveTo(1.5f * w, 14f * h); lineTo(4.5f * w, 5.5f * h); lineTo(8.5f * w, 10.5f * h)
-                                lineTo(10f * w, 1.5f * h); lineTo(11.5f * w, 10.5f * h); lineTo(15.5f * w, 5.5f * h)
-                                lineTo(18.5f * w, 14f * h); close()
-                            }
-                            drawPath(p, Color.White)
-                        }
-                        Text("Premium Subscription", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-                    }
-                    Spacer(Modifier.height(8.dp))
-                    Text(
-                        "Sign up and log in to purchase a Premium subscription and get full access to all servers and apps.",
-                        fontSize = 12.5.sp, color = Color.White.copy(alpha = 0.95f), lineHeight = 19.sp,
-                    )
+                    Text("⭐ Upgrade to Premium", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                    Spacer(Modifier.height(4.dp))
+                    Text("Full access to all servers and apps.", fontSize = 12.sp, color = Color.White.copy(alpha = 0.9f))
                 }
             }
 
             Column(
-                modifier = Modifier.padding(horizontal = 16.dp, vertical = 16.dp),
-                verticalArrangement = Arrangement.spacedBy(12.dp),
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                // Currency tabs
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    CurrencyTab(
-                        modifier = Modifier.weight(1f),
-                        active = currency == "usd",
-                        top = "USD · Dollar",
-                        amount = "$2.50",
-                        bottom = "per month",
-                        onClick = { currency = "usd" },
-                    )
-                    CurrencyTab(
-                        modifier = Modifier.weight(1f),
-                        active = currency == "tmn",
-                        top = "TMN · Toman",
-                        amount = "300,000",
-                        bottom = "per month",
-                        onClick = { currency = "tmn" },
-                    )
+                    PlanPill(modifier = Modifier.weight(1f), name = "PRO", usd = "$3", tmn = "500,000", color = Color(0xFF279491))
+                    PlanPill(modifier = Modifier.weight(1f), name = "Premium", usd = "$5", tmn = "700,000", color = Color(0xFFF59E0B))
                 }
 
-                // Bank card (switches with the selected currency)
-                PremiumBankCard(
-                    card = card,
-                    copied = copied,
-                    onCopy = { clipboard.setText(AnnotatedString(card.number.replace(" ", ""))); copied = true },
-                )
-
-                // Closing instructions
                 Row(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(13.dp))
-                        .background(Color(0xFF279491).copy(alpha = 0.10f))
-                        .padding(horizontal = 13.dp, vertical = 11.dp),
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF279491).copy(alpha = 0.09f))
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
                     horizontalArrangement = Arrangement.spacedBy(8.dp),
                 ) {
-                    Text("ℹ", fontSize = 14.sp, color = Color(0xFF279491))
+                    Text("ℹ", fontSize = 13.sp, color = Color(0xFF279491))
                     Text(
-                        "After transferring the amount to the card above, log in and submit your payment receipt in the Profile section to activate your subscription.",
-                        fontSize = 11.5.sp, color = Color(0xFF1B6B68), lineHeight = 18.sp, fontWeight = FontWeight.Medium,
+                        "Log in, then go to Profile → Payment to submit your receipt and activate.",
+                        fontSize = 11.sp, color = Color(0xFF1B6B68), lineHeight = 17.sp, fontWeight = FontWeight.Medium,
                     )
                 }
 
-                // Login CTA
                 Box(
                     modifier = Modifier
                         .fillMaxWidth()
-                        .clip(RoundedCornerShape(14.dp))
+                        .clip(RoundedCornerShape(13.dp))
                         .background(Brush.linearGradient(listOf(Color(0xFF4ECAC5), Color(0xFF279491))))
-                        .clickable { onGoToLogin() }
-                        .padding(vertical = 13.dp),
+                        .clickable { onGoToPayment() }
+                        .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {
-                    Text("Sign in / Sign up to continue", fontSize = 13.5.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                    Text("Go to Payment", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
                 }
 
                 Text(
-                    "Continue later",
+                    "Later",
                     fontSize = 12.sp, color = AppColors.TextMuted, fontWeight = FontWeight.SemiBold,
                     textAlign = TextAlign.Center,
                     modifier = Modifier.fillMaxWidth().clickable { onDismiss() }.padding(vertical = 2.dp),
                 )
-                Spacer(Modifier.height(2.dp))
             }
         }
     }
 }
 
 @Composable
-private fun CurrencyTab(
-    modifier: Modifier,
-    active: Boolean,
-    top: String,
-    amount: String,
-    bottom: String,
-    onClick: () -> Unit,
-) {
+private fun PlanPill(modifier: Modifier, name: String, usd: String, tmn: String, color: Color) {
     Column(
         modifier = modifier
-            .clip(RoundedCornerShape(13.dp))
-            .background(if (active) Color.White else Color(0xFFEAEDF2))
-            .border(
-                width = 1.5.dp,
-                color = if (active) Color(0xFFF5A620) else Color(0xFFEAEDF2),
-                shape = RoundedCornerShape(13.dp),
-            )
-            .clickable { onClick() }
-            .padding(horizontal = 10.dp, vertical = 11.dp),
+            .clip(RoundedCornerShape(14.dp))
+            .background(Color.White)
+            .border(1.5.dp, color.copy(alpha = 0.3f), RoundedCornerShape(14.dp))
+            .padding(horizontal = 10.dp, vertical = 12.dp),
         horizontalAlignment = Alignment.CenterHorizontally,
         verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(top, fontSize = 9.sp, fontWeight = FontWeight.SemiBold, color = if (active) Color(0xFF9A9A9A) else Color(0xFF8A93A5))
-        Text(amount, fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = if (active) Color(0xFFB87209) else Color(0xFF6B7A99))
-        Text(bottom, fontSize = 9.sp, fontWeight = FontWeight.Medium, color = if (active) Color(0xFFC8A060) else Color(0xFFA0AAB8))
-    }
-}
-
-@Composable
-private fun PremiumBankCard(card: PremiumCard, copied: Boolean, onCopy: () -> Unit) {
-    Box(
-        modifier = Modifier
-            .fillMaxWidth()
-            .shadow(14.dp, RoundedCornerShape(20.dp), spotColor = card.shadow)
-            .clip(RoundedCornerShape(20.dp))
-            .background(Brush.linearGradient(card.gradient, start = Offset(0f, 0f), end = Offset(500f, 400f)))
-            .padding(18.dp),
-    ) {
-        Box(
-            modifier = Modifier.size(120.dp).align(Alignment.TopEnd).offset(x = 30.dp, y = (-30).dp)
-                .clip(CircleShape).border(24.dp, Color.White.copy(alpha = 0.08f), CircleShape),
-        )
-        Column {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Top,
-            ) {
-                Column {
-                    Text("TRANSFER TO", fontSize = 8.5.sp, color = Color.White.copy(alpha = 0.55f), letterSpacing = 1.sp)
-                    Text(card.bank, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold, color = Color.White,
-                        modifier = Modifier.padding(top = 2.dp))
-                }
-                Text(card.amount, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
-            }
-            Spacer(Modifier.height(18.dp))
-            Text(card.number, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = Color.White,
-                fontFamily = FontFamily.Monospace, letterSpacing = 2.5.sp)
-            Spacer(Modifier.height(14.dp))
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.Bottom,
-            ) {
-                Column {
-                    Text("CARD HOLDER", fontSize = 8.sp, color = Color.White.copy(alpha = 0.5f),
-                        letterSpacing = 0.8.sp, modifier = Modifier.padding(bottom = 3.dp))
-                    Text(card.holder, fontSize = 11.5.sp, fontWeight = FontWeight.Bold, color = Color.White)
-                }
-                Box(
-                    modifier = Modifier
-                        .clip(RoundedCornerShape(8.dp))
-                        .background(Color.White.copy(alpha = 0.18f))
-                        .border(1.dp, Color.White.copy(alpha = 0.26f), RoundedCornerShape(8.dp))
-                        .clickable { onCopy() }
-                        .padding(horizontal = 11.dp, vertical = 6.dp),
-                ) {
-                    Text(if (copied) "✓ Copied" else "Copy number", fontSize = 9.5.sp,
-                        fontWeight = FontWeight.SemiBold, color = Color.White)
-                }
-            }
-        }
+        Text(name, fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = color)
+        Text(usd, fontSize = 22.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF18182A))
+        Text("$tmn تومان", fontSize = 10.sp, color = Color(0xFF6B7A99))
+        Text("/ month", fontSize = 9.sp, color = Color(0xFF9AA3B2))
     }
 }

@@ -45,7 +45,7 @@ private val Red         = Color(0xFFEF4444)
 
 // ---- Main screen ----
 @Composable
-fun ProfileScreen(vm: AuthViewModel = viewModel(), onSignOut: () -> Unit = {}) {
+fun ProfileScreen(vm: AuthViewModel = viewModel(), onSignOut: () -> Unit = {}, openPaymentOnLoad: Boolean = false, onPaymentOpened: () -> Unit = {}) {
     val state by vm.state.collectAsState()
 
     var showPayment by rememberSaveable { mutableStateOf(false) }
@@ -54,6 +54,10 @@ fun ProfileScreen(vm: AuthViewModel = viewModel(), onSignOut: () -> Unit = {}) {
     LaunchedEffect(Unit) {
         vm.loadProfile()
         vm.loadSubscription()
+    }
+
+    LaunchedEffect(openPaymentOnLoad) {
+        if (openPaymentOnLoad) { showPayment = true; onPaymentOpened() }
     }
 
     Box(

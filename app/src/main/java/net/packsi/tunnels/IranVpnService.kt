@@ -1,8 +1,8 @@
 package net.packsi.tunnels
 
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.content.pm.ServiceInfo
 import android.os.Build
 import androidx.core.app.ServiceCompat
@@ -58,26 +58,14 @@ class IranVpnService : GoBackend.VpnService() {
 
         scope.launch {
             try {
-                val prefs = getSharedPreferences("enabled_apps", Context.MODE_PRIVATE)
-                val enabledPkgs = prefs.getString("enabled_apps", "")
-                    .orEmpty()
-                    .split(",")
-                    .map { it.trim() }
-                    .filter { it.isNotEmpty() }
-                ConnectionLog.add("enabled apps (${enabledPkgs.size})")
-
-                val installedApps = enabledPkgs.filter { pkg ->
-                    try {
-                        packageManager.getPackageInfo(pkg, 0)
-                        true
-                    } catch (e: PackageManager.NameNotFoundException) {
-                        ConnectionLog.add("  not installed: $pkg")
-                        false
-                    }
-                }
-                ConnectionLog.add("installedApps (${installedApps.size}): ${installedApps.take(5).joinToString()}...")
+                val browserEnabled = getSharedPreferences("vpn_settings", Context.MODE_PRIVATE)
+                    .getBoolean("browser_through_vpn", false)
+                val installedApps = WireGuardManager.getEnabledApps(this@IranVpnService, browserEnabled)
+                ConnectionLog.add("installedApps (${installedApps.size}), browsers=$browserEnabled")
 
                 if (installedApps.isEmpty()) {
+                    WireGuardManager.lastError = "No apps selected. Go to Apps tab and enable at least one."
+                    WireGuardManager.earlyFail = true
                     ConnectionLog.add("ERROR: no Iranian apps installed — aborting")
                     stopVpn()
                     return@launch
@@ -85,6 +73,8 @@ class IranVpnService : GoBackend.VpnService() {
 
                 val config = WireGuardManager.buildConfig(this@IranVpnService, installedApps)
                 if (config == null) {
+                    WireGuardManager.lastError = "VPN config missing. Please restart the app."
+                    WireGuardManager.earlyFail = true
                     ConnectionLog.add("ERROR: buildConfig returned null")
                     stopVpn()
                     return@launch
@@ -106,7 +96,10 @@ class IranVpnService : GoBackend.VpnService() {
                 }
                 ConnectionLog.add("backend.setState returned — isRunning = true")
             } catch (e: Exception) {
-                ConnectionLog.add("EXCEPTION in startVpn: ${e::class.simpleName}: ${e.message}")
+                val msg = "${e::class.simpleName}: ${e.message}"
+                WireGuardManager.lastError = "Connection error: $msg"
+                WireGuardManager.earlyFail = true
+                ConnectionLog.add("EXCEPTION in startVpn: $msg")
                 e.cause?.let { ConnectionLog.add("  caused by: ${it::class.simpleName}: ${it.message}") }
                 stopVpn()
             }
@@ -133,6 +126,11 @@ class IranVpnService : GoBackend.VpnService() {
                 isRunning = false
             }
         }
+    }
+
+    override fun onTaskRemoved(rootIntent: Intent?) {
+        // User explicitly closed the app (swipe from recents / Close All) — stop the VPN.
+        stopVpn()
     }
 
     override fun onRevoke() {

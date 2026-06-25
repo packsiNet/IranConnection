@@ -7,7 +7,6 @@ object IranianAppList {
     /** Package names in the free tier — shown at top, no paywall. */
     val FREE_PACKAGES = setOf(
         "com.samanpr.blu",
-        "com.android.chrome",
     )
 
     /** Ordered category labels for premium section grouping. */
@@ -17,7 +16,6 @@ object IranianAppList {
         // ─── Free ────────────────────────────────────────────────────────────
         IranianApp("com.samanpr.blu",                            "Blu Bank",       "بلوبانک"),
         IranianApp("com.samanpr.blujr",                          "Blu Bank Junior", "جونیور بلوبانک"),
-        IranianApp("com.android.chrome",                         "Google Chrome",  "گوگل کروم"),
 
         // ─── Banks ───────────────────────────────────────────────────────────
         IranianApp("ir.bmi.bam.nativeweb",                       "Bank Melli",     "بانک ملی",       "Banks"),

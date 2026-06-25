@@ -3,6 +3,7 @@ package net.packsi.tunnels.data.deviceauth
 import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
+import net.packsi.tunnels.IranVpnService
 import net.packsi.tunnels.utils.DeviceIdHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -34,7 +35,18 @@ class DeviceAuthViewModel(private val context: Context) : ViewModel() {
     val state: StateFlow<DeviceAuthUiState> = _state.asStateFlow()
 
     init {
-        viewModelScope.launch { loadVpnConfig() }
+        viewModelScope.launch {
+            val hasCachedData = DeviceAuthRepository.isLoggedIn(context) &&
+                                DeviceAuthRepository.hasCachedVpnConfig(context)
+            if (hasCachedData) {
+                // Already authenticated with cached config — go directly to READY.
+                // Refresh token + config silently in background without blocking UI.
+                _state.update { it.copy(appStartState = AppStartState.READY) }
+                refreshConfigInBackground()
+            } else {
+                loadVpnConfig()
+            }
+        }
     }
 
     /**
@@ -137,6 +149,26 @@ class DeviceAuthViewModel(private val context: Context) : ViewModel() {
         // Brief pause — user sees the green button before transition
         delay(600)
         _state.update { it.copy(appStartState = AppStartState.READY) }
+    }
+
+    /** Refreshes auth token + VPN config without showing splash. Does not overwrite VPN config
+     *  if the tunnel is currently running (avoids invalidating in-flight connection). */
+    private fun refreshConfigInBackground() {
+        viewModelScope.launch {
+            val deviceId = DeviceIdHelper.getDeviceId(context)
+            when (val result = DeviceAuthRepository.deviceLogin(deviceId)) {
+                is DeviceAuthResult.Success -> {
+                    DeviceAuthRepository.saveAuth(context, result.auth)
+                    if (!IranVpnService.isRunning) {
+                        when (val cfg = DeviceAuthRepository.getVpnConfig(context)) {
+                            is VpnConfigResult.Success -> DeviceAuthRepository.saveVpnConfig(context, cfg.config)
+                            else -> {}
+                        }
+                    }
+                }
+                else -> {}
+            }
+        }
     }
 
     fun retryLoadConfig() {

@@ -19,7 +19,7 @@ android {
 
         // Backend API base URL. Emulator reaches the host machine via 10.0.2.2
         // (not "localhost"). Override per build type / on a real device as needed.
-        buildConfigField("String", "BASE_URL", "\"http://10.0.2.2:5297\"")
+        buildConfigField("String", "BASE_URL", "\"https://core.packsi.net\"")
     }
 
     buildTypes {

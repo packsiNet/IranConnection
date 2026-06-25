@@ -2,7 +2,24 @@
   "permissions": {
     "allow": [
       "Bash(git mv *)",
-      "Bash(git rm *)"
+      "Bash(git rm *)",
+      "Bash(grep -n \"PremiumModal\\\\|PlanPill\\\\|PRO\\\\|Premium\\\\|\\\\$3\\\\|\\\\$5\\\\|500,000\\\\|700,000\" app/src/main/java/net/packsi/tunnels/ui/screens/HomeScreen.kt)",
+      "Bash(JAVA_HOME=/opt/android-studio/jbr ./gradlew assembleDebug)",
+      "Bash(./gradlew installDebug)",
+      "Bash(JAVA_HOME=/home/shahram/Downloads/android-studio/jbr ./gradlew installDebug)",
+      "Bash(/home/shahram/Android/Sdk/platform-tools/adb logcat *)",
+      "Bash(JAVA_HOME=/home/shahram/Downloads/android-studio/jbr ./gradlew clean installDebug)",
+      "Bash(Read \"/tmp/claude-1000/-run-media-shahram-New-Volume-Projects-IranConnection/c19ea003-2640-408e-9ab0-2f7f466e9c2a/tasks/b308iebzh.output\")",
+      "Bash(JAVA_HOME=/home/shahram/Downloads/android-studio/jbr ./gradlew --no-build-cache clean installDebug)",
+      "Bash(JAVA_HOME=/home/shahram/Downloads/android-studio/jbr ./gradlew --no-build-cache installDebug)",
+      "Bash(JAVA_HOME=/home/shahram/Downloads/android-studio/jbr ./gradlew --no-build-cache assembleDebug)",
+      "Bash(JAVA_HOME=/home/shahram/Downloads/android-studio/jbr ./gradlew --offline --no-build-cache installDebug)",
+      "Bash(JAVA_HOME=/home/shahram/Downloads/android-studio/jbr ./gradlew installDebug --stacktrace)",
+      "Bash(JAVA_HOME=/home/shahram/Downloads/android-studio/jbr ./gradlew installDebug --info)",
+      "Bash(JAVA_HOME=/home/shahram/Downloads/android-studio/jbr ./gradlew --no-build-cache installDebug --info)"
+    ],
+    "additionalDirectories": [
+      "/home/shahram/.gradle"
     ]
   }
 }

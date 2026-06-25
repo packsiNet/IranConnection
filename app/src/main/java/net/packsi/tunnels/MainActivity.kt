@@ -37,7 +37,6 @@ import net.packsi.tunnels.ui.components.AppBottomNav
 import net.packsi.tunnels.ui.components.NavTab
 import net.packsi.tunnels.ui.components.UpdateDialog
 import net.packsi.tunnels.ui.screens.AppsScreen
-import net.packsi.tunnels.ui.screens.BrowserScreen
 import net.packsi.tunnels.ui.screens.HomeScreen
 import net.packsi.tunnels.ui.screens.LogScreen
 import net.packsi.tunnels.ui.screens.ProfileScreen
@@ -130,6 +129,7 @@ private fun AppRoot(
     }
 
     var showLogPanel by remember { mutableStateOf(false) }
+    var openPayment by remember { mutableStateOf(false) }
 
     val buttonEnabled = state.status != VpnStatus.DISCONNECTING
     val onToggle: () -> Unit = {
@@ -163,12 +163,15 @@ private fun AppRoot(
                         onServerCardClick = {},
                         onShowLogs = { showLogPanel = true },
                         onGoToLogin = { tab = NavTab.PROFILE },
+                        onGoToPayment = { tab = NavTab.PROFILE; openPayment = true },
                         configStatus = ConfigFetchStatus.Success,
                         buttonEnabled = buttonEnabled,
+                        errorMessage = state.errorMessage,
+                        browserVpnEnabled = state.browserVpnEnabled,
+                        onBrowserVpnChange = { vm.setBrowserVpn(it) },
                     )
                     NavTab.APPS -> AppsScreen(onClose = { tab = NavTab.HOME })
-                    NavTab.BROWSER -> BrowserScreen()
-                    NavTab.PROFILE -> ProfileScreen(onSignOut = onSignOut)
+NavTab.PROFILE -> ProfileScreen(onSignOut = onSignOut, openPaymentOnLoad = openPayment, onPaymentOpened = { openPayment = false })
                 }
             }
             AppBottomNav(

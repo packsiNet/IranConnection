@@ -157,6 +157,12 @@ object DeviceAuthRepository {
 
     fun isLoggedIn(context: Context): Boolean = getAccessToken(context) != null
 
+    fun hasCachedVpnConfig(context: Context): Boolean {
+        val prefs = context.getSharedPreferences("wireguard", Context.MODE_PRIVATE)
+        return prefs.getString("endpoint", null) != null &&
+               prefs.getString("client_priv_key", null) != null
+    }
+
     fun logout(context: Context) {
         context.getSharedPreferences("auth", Context.MODE_PRIVATE)
             .edit().clear().apply()

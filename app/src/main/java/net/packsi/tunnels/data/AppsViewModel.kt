@@ -56,7 +56,9 @@ class AppsViewModel(app: Application) : AndroidViewModel(app) {
                     .filter { it.isNotEmpty() }
                     .toSet()
             } else {
-                detected.map { it.packageName }.toSet()
+                val defaultEnabled = detected.map { it.packageName }.toSet()
+                enabledPrefs.edit().putString("enabled_apps", defaultEnabled.joinToString(",")).apply()
+                defaultEnabled
             }
 
             _state.value = _state.value.copy(
