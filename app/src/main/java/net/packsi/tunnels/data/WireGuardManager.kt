@@ -47,7 +47,14 @@ object WireGuardManager {
             prefs.edit().putString("enabled_apps", defaults.joinToString(",")).apply()
             defaults
         }
-        val allPkgs = if (includeBrowsers) iranianApps + BROWSER_PACKAGES else iranianApps
+        // When the browser toggle is OFF, browsers must NEVER be tunneled — even if a
+        // browser package leaked into the saved enabled_apps set (catalog detection or an
+        // older build). So strip BROWSER_PACKAGES explicitly instead of merely not adding them.
+        val allPkgs = if (includeBrowsers) {
+            iranianApps + BROWSER_PACKAGES
+        } else {
+            iranianApps.filter { it !in BROWSER_PACKAGES }
+        }
         return allPkgs.filter { pkg ->
             try { pm.getPackageInfo(pkg, 0); true }
             catch (_: PackageManager.NameNotFoundException) { false }
