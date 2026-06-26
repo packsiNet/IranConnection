@@ -58,6 +58,13 @@ dependencies {
     implementation("com.squareup.retrofit2:retrofit:2.9.0")
     implementation("com.squareup.retrofit2:converter-gson:2.9.0")
     implementation("com.squareup.okhttp3:okhttp:4.12.0")
-    implementation("com.wireguard.android:tunnel:1.0.20230706")
+    // AmneziaWG tunnel is VENDORED, not pulled from a repo: the lib is published nowhere
+    // (not Maven Central; JitPack can't build its Go native). So its Java sources live under
+    // app/src/main/java/org/amnezia/awg and the prebuilt native libs (libwg-go/libwg/libwg-quick,
+    // extracted from the official amneziawg APK) live under app/src/main/jniLibs. These are the
+    // tunnel module's only external compile deps. androidx.annotation + androidx.collection are
+    // already on the app classpath transitively (compose/core), so only jsr305 (compile-time
+    // nullness meta-annotations in NonNullForAll) must be added; it is runtime-irrelevant.
+    compileOnly("com.google.code.findbugs:jsr305:3.0.2")
     debugImplementation(libs.androidx.ui.tooling)
 }

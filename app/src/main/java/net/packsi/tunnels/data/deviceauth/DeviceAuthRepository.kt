@@ -137,14 +137,29 @@ object DeviceAuthRepository {
     }
 
     fun saveVpnConfig(context: Context, config: VpnConfigResponse) {
-        context.getSharedPreferences("wireguard", Context.MODE_PRIVATE)
+        val editor = context.getSharedPreferences("wireguard", Context.MODE_PRIVATE)
             .edit()
             .putString("endpoint", config.serverEndpoint)
             .putString("server_pub_key", config.serverPublicKey)
             .putString("client_priv_key", config.privateKey)
             .putString("address", config.assignedIp)
             .putString("dns", config.dns)
-            .apply()
+        // AmneziaWG obfuscation params, stored as strings for Interface.Builder.parse*.
+        // null → removed, so a plain-WG response cleanly drops stale obfuscation.
+        fun putAwg(key: String, value: Number?) {
+            if (value != null) editor.putString(key, value.toString()) else editor.remove(key)
+        }
+        val o = config.obfuscation
+        putAwg("awg_jc",   o?.jc)
+        putAwg("awg_jmin", o?.jmin)
+        putAwg("awg_jmax", o?.jmax)
+        putAwg("awg_s1",   o?.s1)
+        putAwg("awg_s2",   o?.s2)
+        putAwg("awg_h1",   o?.h1)
+        putAwg("awg_h2",   o?.h2)
+        putAwg("awg_h3",   o?.h3)
+        putAwg("awg_h4",   o?.h4)
+        editor.apply()
     }
 
     fun getAccessToken(context: Context): String? =
@@ -174,6 +189,9 @@ object DeviceAuthRepository {
             .remove("client_priv_key")
             .remove("address")
             .remove("dns")
+            .remove("awg_jc").remove("awg_jmin").remove("awg_jmax")
+            .remove("awg_s1").remove("awg_s2")
+            .remove("awg_h1").remove("awg_h2").remove("awg_h3").remove("awg_h4")
             .apply()
         runCatching { TokenStore.init(context); TokenStore.clear() }
     }

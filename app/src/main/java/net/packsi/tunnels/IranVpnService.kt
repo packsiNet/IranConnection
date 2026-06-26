@@ -8,8 +8,8 @@ import android.os.Build
 import androidx.core.app.ServiceCompat
 import net.packsi.tunnels.data.ConnectionLog
 import net.packsi.tunnels.data.WireGuardManager
-import com.wireguard.android.backend.GoBackend
-import com.wireguard.android.backend.Tunnel
+import org.amnezia.awg.backend.GoBackend
+import org.amnezia.awg.backend.Tunnel
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch

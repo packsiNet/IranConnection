@@ -4,12 +4,13 @@ import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
 import net.packsi.tunnels.IranVpnService
-import com.wireguard.android.backend.GoBackend
-import com.wireguard.android.backend.Tunnel
-import com.wireguard.config.Config
-import com.wireguard.config.InetNetwork
-import com.wireguard.config.Interface as WgInterface
-import com.wireguard.config.Peer
+import org.amnezia.awg.backend.GoBackend
+import org.amnezia.awg.backend.Tunnel
+import org.amnezia.awg.config.Config
+import org.amnezia.awg.config.InetAddresses
+import org.amnezia.awg.config.InetNetwork
+import org.amnezia.awg.config.Interface as WgInterface
+import org.amnezia.awg.config.Peer
 
 object WireGuardManager {
 
@@ -62,6 +63,30 @@ object WireGuardManager {
     }
 
 
+    private const val FALLBACK_DNS = "1.1.1.1"
+
+    /**
+     * Returns a PUBLIC DNS IPv4 to put on the VPN interface. If the server-sent dns is a
+     * usable public IPv4, keep it; otherwise (blank / private / CGNAT / IPv6) fall back to
+     * 1.1.1.1, because a non-public DNS breaks excluded apps under split-tunnel.
+     */
+    private fun pickPublicDns(serverDns: String?): String {
+        val d = serverDns?.trim().orEmpty()
+        // Only accept a plain IPv4 literal; comma lists, hostnames, IPv6 → fallback.
+        val octets = d.split(".")
+        if (octets.size != 4) return FALLBACK_DNS
+        val n = octets.map { it.toIntOrNull() ?: return FALLBACK_DNS }
+        if (n.any { it !in 0..255 }) return FALLBACK_DNS
+        val isPrivate =
+            n[0] == 10 ||
+            (n[0] == 172 && n[1] in 16..31) ||
+            (n[0] == 192 && n[1] == 168) ||
+            (n[0] == 100 && n[1] in 64..127) ||   // CGNAT 100.64.0.0/10
+            n[0] == 127 ||                          // loopback
+            n[0] == 0 || n[0] >= 224                // unspecified / multicast / reserved
+        return if (isPrivate) FALLBACK_DNS else d
+    }
+
     private var _backend: GoBackend? = null
 
     @Volatile
@@ -103,17 +128,57 @@ object WireGuardManager {
             if (address == null)       { ConnectionLog.add("ERROR: address missing");          return null }
             if (endpoint == null)      { ConnectionLog.add("ERROR: endpoint missing");         return null }
 
-            // DNS is intentionally NOT set on the VPN interface.
-            // Android applies VPN-interface DNS SYSTEM-WIDE (not per-app), so with
-            // split-tunnel (includeApplication) the DNS IP is only routable inside the
-            // tunnel while non-tunneled apps still get pointed at it — their DNS queries
-            // are dropped and ALL apps lose internet (confirmed on Samsung/A16:
-            // NetdEventListenerService logs isBlocked=true for non-tunneled apps).
-            // Tunneled apps instead resolve via the WireGuard peer (0.0.0.0/0); the VPN
-            // server must NAT/forward their DNS upstream.
+            // DNS MUST be a PUBLIC resolver. Android applies VPN-interface DNS system-wide,
+            // so the DNS IP has to be reachable BOTH ways:
+            //   - tunneled apps reach it through the tunnel (0.0.0.0/0),
+            //   - non-tunneled (excluded) apps reach it directly on the underlying network.
+            // A public resolver (1.1.1.1) satisfies both. A tunnel-PRIVATE DNS (10.x etc.)
+            // does NOT — excluded apps can't route to it and lose internet (the earlier
+            // Samsung/A16 breakage). Without ANY DNS, tunneled apps fall back to the phone's
+            // system resolver, which on some carriers (e.g. Canada CGNAT/IPv6) is unreachable
+            // from the VPN server → connect succeeds but apps see no internet.
+            val dnsServer = pickPublicDns(dns)
+            ConnectionLog.add("  dns server=$dnsServer (server-sent=$dns)")
+            // MTU pinned to 1280. WireGuard's default (1420) is too large on some client
+            // uplinks (PPPoE/CGNAT/IPv6 6rd, common outside Iran): the handshake (small
+            // packets) succeeds so the tunnel shows CONNECTED, but full-size data packets
+            // (DNS replies, TLS) exceed the path MTU and get silently dropped → apps see
+            // "no internet" / DNS_PROBE_FINISHED_NO_INTERNET. 1280 is the IPv6 minimum MTU
+            // and passes on virtually every path.
             var ifaceBuilder = WgInterface.Builder()
                 .parsePrivateKey(clientPrivKey)
                 .addAddress(InetNetwork.parse(address))
+                .addDnsServer(InetAddresses.parse(dnsServer))
+                .setMtu(1280)
+
+            // AmneziaWG obfuscation params. Must be present AND match the server's [Interface]
+            // exactly, or the handshake never completes (plain-WG signature is DPI-blocked on some
+            // foreign networks — see the abroad peer stuck at handshake=0). Applied only when all
+            // are saved; a missing set means a plain-WG server, so we skip and behave like vanilla.
+            val awg = prefs.run {
+                mapOf(
+                    "Jc" to getString("awg_jc", null), "Jmin" to getString("awg_jmin", null),
+                    "Jmax" to getString("awg_jmax", null), "S1" to getString("awg_s1", null),
+                    "S2" to getString("awg_s2", null), "H1" to getString("awg_h1", null),
+                    "H2" to getString("awg_h2", null), "H3" to getString("awg_h3", null),
+                    "H4" to getString("awg_h4", null),
+                )
+            }
+            if (awg.values.all { it != null }) {
+                ifaceBuilder
+                    .parseJunkPacketCount(awg["Jc"]!!)
+                    .parseJunkPacketMinSize(awg["Jmin"]!!)
+                    .parseJunkPacketMaxSize(awg["Jmax"]!!)
+                    .parseInitPacketJunkSize(awg["S1"]!!)
+                    .parseResponsePacketJunkSize(awg["S2"]!!)
+                    .parseInitPacketMagicHeader(awg["H1"]!!)
+                    .parseResponsePacketMagicHeader(awg["H2"]!!)
+                    .parseUnderloadPacketMagicHeader(awg["H3"]!!)
+                    .parseTransportPacketMagicHeader(awg["H4"]!!)
+                ConnectionLog.add("  AmneziaWG obfuscation applied (Jc=${awg["Jc"]} H1=${awg["H1"]})")
+            } else {
+                ConnectionLog.add("  AmneziaWG params absent → plain WG mode")
+            }
 
             for (pkg in apps) {
                 ifaceBuilder = ifaceBuilder.includeApplication(pkg)
