@@ -24,7 +24,7 @@ object UpdateManager {
             val remoteVersion = config.getString(KEY_VERSION)
             val downloadUrl = config.getString(KEY_DOWNLOAD_URL)
             if (isNewerVersion(remoteVersion, currentVersion)) {
-                UpdateInfo.UpdateAvailable(remoteVersion, downloadUrl)
+                UpdateInfo.UpdateAvailable(remoteVersion, downloadUrl, isMajor(remoteVersion, currentVersion))
             } else {
                 UpdateInfo.UpToDate
             }
@@ -46,9 +46,23 @@ object UpdateManager {
         }
         return false
     }
+
+    /**
+     * A MAJOR bump (the first version component increased, e.g. 1.x.x → 2.x.x) is mandatory:
+     * the user can't keep using the app without updating. A minor/patch bump is optional.
+     */
+    private fun isMajor(remote: String, current: String): Boolean {
+        val r = remote.trim().split(".").firstOrNull()?.toIntOrNull() ?: 0
+        val c = current.trim().split(".").firstOrNull()?.toIntOrNull() ?: 0
+        return r > c
+    }
 }
 
 sealed class UpdateInfo {
     object UpToDate : UpdateInfo()
-    data class UpdateAvailable(val newVersion: String, val downloadUrl: String) : UpdateInfo()
+    data class UpdateAvailable(
+        val newVersion: String,
+        val downloadUrl: String,
+        val isMajor: Boolean,
+    ) : UpdateInfo()
 }

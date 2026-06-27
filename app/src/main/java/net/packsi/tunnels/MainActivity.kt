@@ -118,7 +118,9 @@ private fun AppRoot(
         UpdateDialog(
             newVersion = info.newVersion,
             downloadUrl = info.downloadUrl,
-            onDismiss = { showUpdateDialog = false },
+            isMajor = info.isMajor,
+            // Major = mandatory; the dialog itself ignores dismiss. Minor = "Remind Me Later".
+            onDismiss = { if (!info.isMajor) showUpdateDialog = false },
         )
     }
 

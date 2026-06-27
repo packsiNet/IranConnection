@@ -35,7 +35,7 @@ object NotificationHelper {
         )
         return NotificationCompat.Builder(context, CHANNEL_ID)
             .setContentTitle("IranConnect")
-            .setContentText("VPN فعال است — برنامه‌های ایرانی محافظت می‌شوند")
+            .setContentText("VPN is active — Iranian programs are protected")
             .setSmallIcon(android.R.drawable.ic_dialog_info)
             .setOngoing(true)
             .setContentIntent(openApp)
