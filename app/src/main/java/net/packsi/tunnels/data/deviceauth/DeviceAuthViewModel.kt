@@ -4,6 +4,9 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import net.packsi.tunnels.IranVpnService
+import net.packsi.tunnels.data.UpdateManager
+import net.packsi.tunnels.data.subscription.CatalogCache
+import net.packsi.tunnels.data.subscription.SubscriptionRepository
 import net.packsi.tunnels.utils.DeviceIdHelper
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -35,16 +38,29 @@ class DeviceAuthViewModel(private val context: Context) : ViewModel() {
     val state: StateFlow<DeviceAuthUiState> = _state.asStateFlow()
 
     init {
-        viewModelScope.launch {
-            val hasCachedData = DeviceAuthRepository.isLoggedIn(context) &&
-                                DeviceAuthRepository.hasCachedVpnConfig(context)
-            if (hasCachedData) {
-                // Already authenticated with cached config — go directly to READY.
-                // Refresh token + config silently in background without blocking UI.
-                _state.update { it.copy(appStartState = AppStartState.READY) }
-                refreshConfigInBackground()
-            } else {
-                loadVpnConfig()
+        val hasCachedData = DeviceAuthRepository.isLoggedIn(context) &&
+                            DeviceAuthRepository.hasCachedVpnConfig(context)
+
+        if (hasCachedData) {
+            // Cached session → show the app IMMEDIATELY (no splash flash). Then check the apps
+            // version in the background: only a CHANGED IranianAppsUpdateVersion re-runs the splash
+            // to refetch the catalog live; otherwise just refresh token/config silently.
+            _state.update { it.copy(appStartState = AppStartState.READY) }
+            viewModelScope.launch {
+                val appsVersion = UpdateManager.fetchAppsCatalogVersion()
+                val appsVersionChanged = appsVersion != null &&
+                                         appsVersion != CatalogCache.savedVersion(context)
+                if (appsVersionChanged) {
+                    loadVpnConfig(appsVersion)   // flips back to splash, refetches, returns to READY
+                } else {
+                    refreshConfigInBackground()
+                }
+            }
+        } else {
+            // First run / cleared cache → full splash, capturing the current apps version.
+            viewModelScope.launch {
+                val appsVersion = UpdateManager.fetchAppsCatalogVersion()
+                loadVpnConfig(appsVersion)
             }
         }
     }
@@ -58,7 +74,7 @@ class DeviceAuthViewModel(private val context: Context) : ViewModel() {
      * Step 3  Detecting apps   — GET  /api/subscription/apps  (non-fatal)
      * Step 4  Routing rules    — simulated delay  → READY
      */
-    private suspend fun loadVpnConfig() {
+    private suspend fun loadVpnConfig(appsVersion: String? = null) {
         _state.update {
             it.copy(
                 appStartState = AppStartState.LOADING_CONFIG,
@@ -131,10 +147,17 @@ class DeviceAuthViewModel(private val context: Context) : ViewModel() {
             }
         }
 
-        // Step 3: Detecting Persian apps — GET /api/subscription/apps (non-fatal)
-        DeviceAuthRepository.getAppCatalog(context).fold(
+        // Step 3: Detecting Persian apps — GET /api/subscription/apps (non-fatal).
+        // This is the once-per-cold-start catalog fetch; cache it so the Apps screen reads it
+        // without re-hitting the network (its refresh button is the other fetch path).
+        SubscriptionRepository.getAppCatalog().fold(
             onSuccess = { catalog ->
-                DeviceAuthRepository.saveAppCatalog(context, catalog)
+                if (catalog.isNotEmpty()) {
+                    CatalogCache.save(context, catalog)
+                    // Mark this catalog as current for the RC version that triggered the fetch, so
+                    // the next launch with the same version skips the forced splash.
+                    if (appsVersion != null) CatalogCache.setVersion(context, appsVersion)
+                }
                 _state.update { it.copy(loadingCompletedSteps = 4) }
             },
             onFailure = {

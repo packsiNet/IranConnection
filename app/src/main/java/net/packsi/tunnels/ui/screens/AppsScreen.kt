@@ -123,7 +123,7 @@ fun AppsScreen(
             Modifier.fillMaxWidth().padding(start = 16.dp, end = 16.dp, bottom = 4.dp),
             horizontalArrangement = Arrangement.End,
         ) {
-            RefreshButton(isLoading = state.isLoading, onClick = vm::loadApps)
+            RefreshButton(isLoading = state.isLoading, onClick = { vm.loadApps(forceRefresh = true) })
         }
 
         when {

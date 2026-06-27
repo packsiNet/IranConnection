@@ -9,6 +9,10 @@ object UpdateManager {
 
     private const val KEY_VERSION = "version"
     private const val KEY_DOWNLOAD_URL = "download_url"
+    // Bumped on the server whenever the Iranian-apps catalog changes; a new value forces one
+    // splash run so the list is re-fetched live. NOTE: the Remote Config key is spelled exactly
+    // "IranianAppsUpdateVersion" — keep it identical to the console.
+    private const val KEY_APPS_VERSION = "IranianAppsUpdateVersion"
 
     suspend fun checkForUpdate(currentVersion: String): UpdateInfo {
         val config = Firebase.remoteConfig
@@ -31,6 +35,25 @@ object UpdateManager {
         } catch (e: Exception) {
             android.util.Log.e("UpdateManager", "Remote Config fetch failed", e)
             UpdateInfo.UpToDate
+        }
+    }
+
+    /**
+     * Reads the apps-catalog version from Remote Config. Returns null on any failure (e.g. RC not
+     * reachable) so callers treat "unknown" as "no change" and don't force an unnecessary splash.
+     */
+    suspend fun fetchAppsCatalogVersion(): String? {
+        val config = Firebase.remoteConfig
+        return try {
+            config.setConfigSettingsAsync(
+                remoteConfigSettings { minimumFetchIntervalInSeconds = 0 }
+            ).await()
+            config.setDefaultsAsync(mapOf(KEY_APPS_VERSION to "")).await()
+            config.fetchAndActivate().await()
+            config.getString(KEY_APPS_VERSION).ifBlank { null }
+        } catch (e: Exception) {
+            android.util.Log.e("UpdateManager", "apps version fetch failed", e)
+            null
         }
     }
 

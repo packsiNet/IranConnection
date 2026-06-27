@@ -110,32 +110,6 @@ object DeviceAuthRepository {
             }
         }
 
-    suspend fun getAppCatalog(context: Context): Result<List<AppCatalogItem>> =
-        withContext(Dispatchers.IO) {
-            runCatching {
-                val token = getAccessToken(context) ?: error("No token")
-                val request = Request.Builder()
-                    .url("${AppConstants.BASE_URL}subscription/apps")
-                    .get()
-                    .addHeader("Authorization", "Bearer $token")
-                    .build()
-                val response = client.newCall(request).execute()
-                val body = response.body?.string() ?: ""
-                if (response.isSuccessful) {
-                    gson.fromJson(body, Array<AppCatalogItem>::class.java).toList()
-                } else {
-                    error("HTTP ${response.code}")
-                }
-            }
-        }
-
-    fun saveAppCatalog(context: Context, catalog: List<AppCatalogItem>) {
-        context.getSharedPreferences("catalog", Context.MODE_PRIVATE)
-            .edit()
-            .putString("apps_json", gson.toJson(catalog))
-            .apply()
-    }
-
     fun saveVpnConfig(context: Context, config: VpnConfigResponse) {
         val editor = context.getSharedPreferences("wireguard", Context.MODE_PRIVATE)
             .edit()

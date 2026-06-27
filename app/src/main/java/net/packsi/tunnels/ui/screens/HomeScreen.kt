@@ -83,6 +83,7 @@ fun HomeScreen(
     errorMessage: String? = null,
     browserVpnEnabled: Boolean = false,
     onBrowserVpnChange: (Boolean) -> Unit = {},
+    reconnecting: Boolean = false,
 ) {
     val accent by animateColorAsState(if (connected) AppColors.Teal else AppColors.Red, label = "accent")
 
@@ -121,7 +122,8 @@ fun HomeScreen(
                     statusLabel,
                     fontSize = 13.sp,
                     fontWeight = FontWeight.SemiBold,
-                    color = accent,
+                    // Amber while reconnecting to flag the transient churn without the red/disconnect look.
+                    color = if (reconnecting) AppColors.Gold else accent,
                 )
             }
             if (errorMessage != null) {
@@ -168,7 +170,13 @@ fun HomeScreen(
             PowerButton(connected, accent, buttonEnabled, onToggle)
         }
 
-        BrowserToggleRow(enabled = browserVpnEnabled, connected = connected, onChange = onBrowserVpnChange)
+        BrowserToggleRow(
+            enabled = browserVpnEnabled,
+            connected = connected,
+            premium = isPremium,
+            onChange = onBrowserVpnChange,
+            onLockedClick = { showPremiumModal = true },
+        )
         ServerCard(connected = connected, serverIp = serverIp, onClick = onServerCardClick)
         Spacer(Modifier.height(12.dp))
     }
@@ -414,7 +422,15 @@ private fun PowerButton(connected: Boolean, accent: Color, enabled: Boolean, onT
 }
 
 @Composable
-private fun BrowserToggleRow(enabled: Boolean, connected: Boolean, onChange: (Boolean) -> Unit) {
+private fun BrowserToggleRow(
+    enabled: Boolean,
+    connected: Boolean,
+    premium: Boolean,
+    onChange: (Boolean) -> Unit,
+    onLockedClick: () -> Unit,
+) {
+    // The toggle is a premium feature and only meaningful while the tunnel is up.
+    val interactive = connected && premium
     val trackColor by animateColorAsState(
         targetValue = if (enabled) AppColors.Teal else Color(0xFF9494A8),
         animationSpec = tween(220),
@@ -432,14 +448,22 @@ private fun BrowserToggleRow(enabled: Boolean, connected: Boolean, onChange: (Bo
             .fillMaxWidth()
             .padding(horizontal = 18.dp)
             .padding(bottom = 10.dp)
-            .alpha(if (connected) 1f else 0.45f)
+            .alpha(if (interactive) 1f else 0.45f)
             .shadow(6.dp, RoundedCornerShape(16.dp))
             .background(AppColors.CardBg, RoundedCornerShape(16.dp))
             .then(
-                if (connected) Modifier.clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                ) { onChange(!enabled) } else Modifier
+                when {
+                    interactive -> Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onChange(!enabled) }
+                    // Connected but not premium → tapping nudges the user to upgrade.
+                    connected && !premium -> Modifier.clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                    ) { onLockedClick() }
+                    else -> Modifier
+                }
             )
             .padding(horizontal = 14.dp, vertical = 11.dp),
         verticalAlignment = Alignment.CenterVertically,
@@ -492,9 +516,9 @@ private fun BrowserToggleRow(enabled: Boolean, connected: Boolean, onChange: (Bo
                     color = AppColors.TextPrimary,
                 )
                 Text(
-                    "Chrome · Firefox · Edge · Brave",
+                    if (premium) "Chrome · Firefox · Edge · Brave" else "Premium feature — upgrade to enable",
                     fontSize = 11.sp,
-                    color = AppColors.TextMuted,
+                    color = if (premium) AppColors.TextMuted else AppColors.Gold,
                 )
             }
         }

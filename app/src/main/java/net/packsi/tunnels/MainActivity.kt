@@ -133,12 +133,15 @@ private fun AppRoot(
     var showLogPanel by remember { mutableStateOf(false) }
     var openPayment by remember { mutableStateOf(false) }
 
-    val buttonEnabled = state.status != VpnStatus.DISCONNECTING
+    // Stay enabled through a toggle reconnect (the button looks connected the whole time).
+    val buttonEnabled = state.reconnecting || state.status != VpnStatus.DISCONNECTING
     val onToggle: () -> Unit = {
-        when (state.status) {
-            VpnStatus.CONNECTED -> vm.stopTunnel()
-            VpnStatus.CONNECTING -> vm.cancelConnecting()
-            VpnStatus.DISCONNECTING -> {}
+        when {
+            // During a silent reconnect the button reads as connected → a tap fully disconnects.
+            state.reconnecting -> vm.cancelReconnect()
+            state.status == VpnStatus.CONNECTED -> vm.stopTunnel()
+            state.status == VpnStatus.CONNECTING -> vm.cancelConnecting()
+            state.status == VpnStatus.DISCONNECTING -> {}
             else -> {
                 val intent = VpnService.prepare(context)
                 if (intent == null) vm.startTunnel()
@@ -157,7 +160,8 @@ private fun AppRoot(
             Column(Modifier.weight(1f)) {
                 when (tab) {
                     NavTab.HOME -> HomeScreen(
-                        connected = state.connected,
+                        // `active` keeps the green look across a toggle reconnect; the churn shows in labels.
+                        connected = state.active,
                         statusLabel = state.statusLabel,
                         seconds = state.seconds,
                         serverIp = state.serverIp,
@@ -171,6 +175,7 @@ private fun AppRoot(
                         errorMessage = state.errorMessage,
                         browserVpnEnabled = state.browserVpnEnabled,
                         onBrowserVpnChange = { vm.setBrowserVpn(it) },
+                        reconnecting = state.reconnecting,
                     )
                     NavTab.APPS -> AppsScreen(onClose = { tab = NavTab.HOME })
 NavTab.PROFILE -> ProfileScreen(onSignOut = onSignOut, openPaymentOnLoad = openPayment, onPaymentOpened = { openPayment = false })

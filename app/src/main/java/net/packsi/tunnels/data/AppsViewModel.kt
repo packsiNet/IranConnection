@@ -4,6 +4,7 @@ import android.app.Application
 import android.content.Context
 import androidx.lifecycle.AndroidViewModel
 import androidx.lifecycle.viewModelScope
+import net.packsi.tunnels.data.subscription.CatalogCache
 import net.packsi.tunnels.data.subscription.SubscriptionRepository
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -31,21 +32,39 @@ class AppsViewModel(app: Application) : AndroidViewModel(app) {
         loadApps()
     }
 
-    fun loadApps() {
+    /**
+     * @param forceRefresh true = bypass the cache and hit the network (the Apps-list refresh button),
+     *        rewriting the cache. false = cache-first: the catalog the splash flow already fetched is
+     *        reused, and the network is only touched when nothing is cached yet (e.g. first run).
+     */
+    fun loadApps(forceRefresh: Boolean = false) {
         viewModelScope.launch {
             _state.value = _state.value.copy(isLoading = true, error = null)
+            val ctx = getApplication<Application>()
 
-            // 1) Global app catalog. Fall back to the bundled list so the screen isn't empty offline.
-            val catalogResult = SubscriptionRepository.getAppCatalog()
-            val catalog = catalogResult.getOrNull()?.takeIf { it.isNotEmpty() }
-                ?: IranianAppList.asCatalog()
+            // 1) Global app catalog — cache-first. Network on refresh or when the cache is empty;
+            //    fall back to the bundled list so the screen is never empty offline.
+            val cached = if (forceRefresh) null else CatalogCache.load(ctx)
+            var error: String? = null
+            val catalog = if (cached != null) {
+                cached
+            } else {
+                val fresh = SubscriptionRepository.getAppCatalog().getOrNull()?.takeIf { it.isNotEmpty() }
+                if (fresh != null) {
+                    CatalogCache.save(ctx, fresh)
+                    fresh
+                } else {
+                    error = "Failed to load app list; showing local list"
+                    CatalogCache.load(ctx) ?: IranianAppList.asCatalog()
+                }
+            }
 
-            // 2) User plan decides whether Premium apps are locked.
+            // 2) User plan decides whether Premium apps are locked — always live, must be accurate.
             val plan = SubscriptionRepository.getSubscription().getOrNull()?.plan
             val isPremium = plan == "Premium" || plan == "Admin"
 
             // 3) Keep only catalog apps installed on the device.
-            val detected = IranianAppDetector.detectInstalledIranianApps(getApplication(), catalog)
+            val detected = IranianAppDetector.detectInstalledIranianApps(ctx, catalog)
 
             // Before the user touches a toggle, everything detected starts enabled.
             val savedEnabled = if (enabledPrefs.contains("enabled_apps")) {
@@ -67,7 +86,7 @@ class AppsViewModel(app: Application) : AndroidViewModel(app) {
                 premiumApps = detected.filter { !it.isFree },
                 enabledPackages = savedEnabled,
                 isPremium = isPremium,
-                error = if (catalogResult.isFailure) "Failed to load app list; showing local list" else null,
+                error = error,
             )
         }
     }

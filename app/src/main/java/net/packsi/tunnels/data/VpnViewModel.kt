@@ -25,14 +25,22 @@ data class VpnUiState(
     val serverIp: String? = null,
     val errorMessage: String? = null,
     val browserVpnEnabled: Boolean = false,
+    // True during a silent restart triggered by the browser toggle. The tunnel really goes down
+    // and back up, but the UI must NOT flip to the red/disconnected look — only the labels change.
+    val reconnecting: Boolean = false,
 ) {
     val connected: Boolean get() = status == VpnStatus.CONNECTED
-    val statusLabel: String get() = when (status) {
-        VpnStatus.DISCONNECTED  -> "Not Connected"
-        VpnStatus.CONNECTING    -> "Connecting..."
-        VpnStatus.CONNECTED     -> "Connection Secure"
-        VpnStatus.DISCONNECTING -> "Disconnecting..."
-        VpnStatus.FAILED        -> "Connection Failed"
+    /** Drives the green "connected" visuals (button, rings, dot). Stays true across a toggle reconnect. */
+    val active: Boolean get() = connected || reconnecting
+    val statusLabel: String get() = when {
+        reconnecting -> "Reconnecting…"
+        else -> when (status) {
+            VpnStatus.DISCONNECTED  -> "Not Connected"
+            VpnStatus.CONNECTING    -> "Connecting..."
+            VpnStatus.CONNECTED     -> "Connection Secure"
+            VpnStatus.DISCONNECTING -> "Disconnecting..."
+            VpnStatus.FAILED        -> "Connection Failed"
+        }
     }
 }
 
@@ -67,7 +75,8 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
             while (true) {
                 delay(1000)
                 val s = _state.value
-                if (s.connected) {
+                // Keep ticking through a toggle reconnect so the timer doesn't visibly reset.
+                if (s.connected || s.reconnecting) {
                     val ns = s.seconds + 1
                     _state.value = s.copy(seconds = ns)
                     prefs.setSeconds(ns)
@@ -135,8 +144,10 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
 
     fun stopTunnel() {
         val context = getApplication<Application>()
+        // Disconnecting also turns the browser-tunnel toggle off (it's only meaningful while up).
+        vpnSettingsPrefs.edit().putBoolean("browser_through_vpn", false).apply()
         // Show DISCONNECTING instantly; tunnel teardown runs in background.
-        _state.value = _state.value.copy(status = VpnStatus.DISCONNECTING)
+        _state.value = _state.value.copy(status = VpnStatus.DISCONNECTING, browserVpnEnabled = false)
         viewModelScope.launch {
             withContext(Dispatchers.IO) { WireGuardManager.disconnect(context) }
             // Poll isRunning every 500ms, timeout 15s.
@@ -148,6 +159,13 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
             _state.value = _state.value.copy(status = VpnStatus.DISCONNECTED, seconds = 0L, serverIp = null)
             prefs.setConnected(false)
         }
+    }
+
+    /** Tapping the (green) button mid-reconnect: abort the restart and fully disconnect. */
+    fun cancelReconnect() {
+        browserToggleJob?.cancel()
+        _state.update { it.copy(reconnecting = false) }
+        stopTunnel()
     }
 
     fun selectServer(id: String?) {
@@ -165,7 +183,11 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
         browserToggleJob?.cancel()
         browserToggleJob = viewModelScope.launch {
             val context = getApplication<Application>()
-            _state.update { it.copy(status = VpnStatus.DISCONNECTING) }
+            // Silent restart: keep status CONNECTED (button stays green) and only flag `reconnecting`.
+            // The granular DISCONNECTING/CONNECTING is surfaced via reconnectSubLabel, not the button.
+            // We drive status directly here instead of calling startTunnel(), which would flip the
+            // button to CONNECTING and reset the timer.
+            _state.update { it.copy(reconnecting = true, status = VpnStatus.DISCONNECTING, errorMessage = null) }
             withContext(Dispatchers.IO) { WireGuardManager.disconnect(context) }
             var i = 0
             while (i < 20 && withContext(Dispatchers.IO) { WireGuardManager.isConnected() }) {
@@ -173,7 +195,30 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
                 i++
             }
             prefs.setConnected(false)
-            startTunnel()
+
+            _state.update { it.copy(status = VpnStatus.CONNECTING) }
+            withContext(Dispatchers.IO) { WireGuardManager.connect(context) }
+            var j = 0
+            var ok = false
+            while (j < 30) {
+                delay(500)
+                if (WireGuardManager.earlyFail) break
+                if (withContext(Dispatchers.IO) { WireGuardManager.isConnected() }) { ok = true; break }
+                j++
+            }
+            if (ok) {
+                _state.update { it.copy(status = VpnStatus.CONNECTED, reconnecting = false) }
+                prefs.setConnected(true)
+            } else {
+                _state.update {
+                    it.copy(
+                        status = VpnStatus.FAILED,
+                        reconnecting = false,
+                        errorMessage = WireGuardManager.lastError ?: "Reconnect failed.",
+                    )
+                }
+                prefs.setConnected(false)
+            }
         }
     }
 }
