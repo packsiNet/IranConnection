@@ -78,11 +78,13 @@ fun HomeScreen(
     onShowLogs: () -> Unit = {},
     onGoToLogin: () -> Unit = {},
     onGoToPayment: () -> Unit = {},
+    onGoToNoAdsPayment: () -> Unit = {},
     configStatus: ConfigFetchStatus = ConfigFetchStatus.Success,
     buttonEnabled: Boolean = true,
     errorMessage: String? = null,
     browserVpnEnabled: Boolean = false,
     onBrowserVpnChange: (Boolean) -> Unit = {},
+    adSessionRemaining: Long? = null,
 ) {
     val accent by animateColorAsState(if (connected) AppColors.Teal else AppColors.Red, label = "accent")
 
@@ -92,7 +94,10 @@ fun HomeScreen(
         if (authState.isLoggedIn) authVm.loadSubscription()
     }
     val isPremium = authState.subscription?.plan?.let { it == "Premium" || it == "Admin" } ?: false
+    val adsEnabled = authState.adsEnabled
+    val showAds = authState.subscription?.showAds ?: true
     var showPremiumModal by remember { mutableStateOf(false) }
+    var showNoAdsModal by remember { mutableStateOf(false) }
 
     Column(
         Modifier
@@ -104,6 +109,9 @@ fun HomeScreen(
             onShowLogs = onShowLogs,
             isPremium = isPremium,
             onPremiumClick = { if (!isPremium) showPremiumModal = true },
+            adsEnabled = adsEnabled,
+            hasNoAds = !showAds,
+            onNoAdsClick = { if (showAds) showNoAdsModal = true },
         )
 
         // Connection status
@@ -135,16 +143,30 @@ fun HomeScreen(
             }
         }
 
-        // Timer
+        // Timer — counts up in normal mode, counts down (red) in ad-gated session
+        val timerColor by animateColorAsState(
+            targetValue = if (adSessionRemaining != null) AppColors.Red else AppColors.TextPrimary,
+            label = "timerColor",
+        )
         Text(
-            text = formatTime(seconds),
+            text = formatTime(adSessionRemaining ?: seconds),
             modifier = Modifier.fillMaxWidth(),
             fontSize = 58.sp,
             fontWeight = FontWeight.Light,
-            color = AppColors.TextPrimary,
+            color = timerColor,
             textAlign = androidx.compose.ui.text.style.TextAlign.Center,
             letterSpacing = 2.sp,
         )
+        if (adSessionRemaining != null) {
+            Text(
+                text = "Session time remaining",
+                modifier = Modifier.fillMaxWidth(),
+                fontSize = 11.sp,
+                color = AppColors.Red.copy(alpha = 0.75f),
+                textAlign = TextAlign.Center,
+                fontWeight = FontWeight.Medium,
+            )
+        }
 
         // Speed stats
         Row(
@@ -179,6 +201,12 @@ fun HomeScreen(
             onGoToPayment = { showPremiumModal = false; onGoToPayment() },
         )
     }
+    if (showNoAdsModal && adsEnabled) {
+        NoAdsModal(
+            onDismiss = { showNoAdsModal = false },
+            onGoToPayment = { showNoAdsModal = false; onGoToNoAdsPayment() },
+        )
+    }
 }
 
 @Composable
@@ -187,6 +215,9 @@ private fun HomeHeader(
     onShowLogs: () -> Unit,
     isPremium: Boolean,
     onPremiumClick: () -> Unit,
+    adsEnabled: Boolean,
+    hasNoAds: Boolean,
+    onNoAdsClick: () -> Unit,
 ) {
     Row(
         Modifier.fillMaxWidth().padding(start = 20.dp, end = 20.dp, top = 12.dp),
@@ -200,37 +231,81 @@ private fun HomeHeader(
             HamburgerMenu(onShowLogs = onShowLogs)
             ConfigIndicator(configStatus)
         }
-        // Premium badge — a tappable upsell button when the user isn't premium.
         Row(
-            Modifier
-                .shadow(4.dp, RoundedCornerShape(24.dp))
-                .clip(RoundedCornerShape(24.dp))
-                .background(
-                    if (isPremium) Brush.horizontalGradient(listOf(AppColors.CardBg, AppColors.CardBg))
-                    else Brush.horizontalGradient(listOf(Color(0xFFFFF4D6), Color(0xFFFFE9B0))),
-                )
-                .clickable(
-                    interactionSource = remember { MutableInteractionSource() },
-                    indication = null,
-                    enabled = !isPremium,
-                ) { onPremiumClick() }
-                .padding(start = 12.dp, end = if (isPremium) 16.dp else 13.dp, top = 9.dp, bottom = 9.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(7.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp),
         ) {
-            Canvas(Modifier.size(20.dp, 16.dp)) {
-                val w = size.width / 20f
-                val h = size.height / 16f
-                val path = androidx.compose.ui.graphics.Path().apply {
-                    moveTo(1.5f * w, 14f * h); lineTo(4.5f * w, 5.5f * h); lineTo(8.5f * w, 10.5f * h)
-                    lineTo(10f * w, 1.5f * h); lineTo(11.5f * w, 10.5f * h); lineTo(15.5f * w, 5.5f * h)
-                    lineTo(18.5f * w, 14f * h); close()
+            // NoAds badge — hidden entirely when admin disables ads system-wide
+            if (adsEnabled) {
+                Row(
+                    Modifier
+                        .shadow(4.dp, RoundedCornerShape(24.dp))
+                        .clip(RoundedCornerShape(24.dp))
+                        .background(
+                            if (hasNoAds) Brush.horizontalGradient(listOf(AppColors.CardBg, AppColors.CardBg))
+                            else Brush.horizontalGradient(listOf(Color(0xFFEDE9FE), Color(0xFFDDD6FE))),
+                        )
+                        .clickable(
+                            interactionSource = remember { MutableInteractionSource() },
+                            indication = null,
+                            enabled = !hasNoAds,
+                        ) { onNoAdsClick() }
+                        .padding(start = 10.dp, end = if (hasNoAds) 14.dp else 11.dp, top = 9.dp, bottom = 9.dp),
+                    verticalAlignment = Alignment.CenterVertically,
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                ) {
+                    Canvas(Modifier.size(14.dp)) {
+                        val strokeW = if (hasNoAds) 2f else 2.4f
+                        val iconColor = if (hasNoAds) AppColors.TextMuted else Color(0xFF7C3AED)
+                        drawCircle(color = iconColor, style = androidx.compose.ui.graphics.drawscope.Stroke(strokeW))
+                        drawLine(
+                            color = iconColor,
+                            start = Offset(size.width * 0.22f, size.height * 0.78f),
+                            end = Offset(size.width * 0.78f, size.height * 0.22f),
+                            strokeWidth = strokeW,
+                            cap = StrokeCap.Round,
+                        )
+                    }
+                    Text(
+                        "No Ads",
+                        fontSize = 13.sp, fontWeight = FontWeight.SemiBold,
+                        color = if (hasNoAds) AppColors.TextPrimary else Color(0xFF5B21B6),
+                    )
                 }
-                drawPath(path, AppColors.Gold)
             }
-            Text("Premium", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
-            if (!isPremium) {
-                Text("↑", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD9920A))
+
+            // Premium badge
+            Row(
+                Modifier
+                    .shadow(4.dp, RoundedCornerShape(24.dp))
+                    .clip(RoundedCornerShape(24.dp))
+                    .background(
+                        if (isPremium) Brush.horizontalGradient(listOf(AppColors.CardBg, AppColors.CardBg))
+                        else Brush.horizontalGradient(listOf(Color(0xFFFFF4D6), Color(0xFFFFE9B0))),
+                    )
+                    .clickable(
+                        interactionSource = remember { MutableInteractionSource() },
+                        indication = null,
+                        enabled = !isPremium,
+                    ) { onPremiumClick() }
+                    .padding(start = 12.dp, end = if (isPremium) 16.dp else 13.dp, top = 9.dp, bottom = 9.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.spacedBy(7.dp),
+            ) {
+                Canvas(Modifier.size(20.dp, 16.dp)) {
+                    val w = size.width / 20f
+                    val h = size.height / 16f
+                    val path = androidx.compose.ui.graphics.Path().apply {
+                        moveTo(1.5f * w, 14f * h); lineTo(4.5f * w, 5.5f * h); lineTo(8.5f * w, 10.5f * h)
+                        lineTo(10f * w, 1.5f * h); lineTo(11.5f * w, 10.5f * h); lineTo(15.5f * w, 5.5f * h)
+                        lineTo(18.5f * w, 14f * h); close()
+                    }
+                    drawPath(path, AppColors.Gold)
+                }
+                Text("Premium", fontSize = 14.sp, fontWeight = FontWeight.SemiBold, color = AppColors.TextPrimary)
+                if (!isPremium) {
+                    Text("↑", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFFD9920A))
+                }
             }
         }
     }
@@ -696,6 +771,116 @@ private fun PremiumModal(onDismiss: () -> Unit, onGoToPayment: () -> Unit) {
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(13.dp))
                         .background(Brush.linearGradient(listOf(Color(0xFF4ECAC5), Color(0xFF279491))))
+                        .clickable { onGoToPayment() }
+                        .padding(vertical = 12.dp),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Text("Go to Payment", fontSize = 13.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                }
+
+                Text(
+                    "Later",
+                    fontSize = 12.sp, color = AppColors.TextMuted, fontWeight = FontWeight.SemiBold,
+                    textAlign = TextAlign.Center,
+                    modifier = Modifier.fillMaxWidth().clickable { onDismiss() }.padding(vertical = 2.dp),
+                )
+            }
+        }
+    }
+}
+
+@Composable
+private fun NoAdsModal(onDismiss: () -> Unit, onGoToPayment: () -> Unit) {
+    Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
+        Column(
+            modifier = Modifier
+                .fillMaxWidth()
+                .padding(horizontal = 20.dp)
+                .widthIn(max = 400.dp)
+                .clip(RoundedCornerShape(24.dp))
+                .background(Color(0xFFF4F6FA)),
+        ) {
+            // Header — purple gradient, clearly distinct from the gold premium header
+            Box(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .background(
+                        Brush.linearGradient(
+                            listOf(Color(0xFF9F67F5), Color(0xFF7C3AED), Color(0xFF5B21B6)),
+                            start = Offset(0f, 0f), end = Offset(600f, 200f),
+                        ),
+                    )
+                    .padding(horizontal = 18.dp, vertical = 16.dp),
+            ) {
+                Box(
+                    modifier = Modifier
+                        .align(Alignment.TopEnd)
+                        .size(26.dp)
+                        .clip(CircleShape)
+                        .background(Color.White.copy(alpha = 0.25f))
+                        .clickable { onDismiss() },
+                    contentAlignment = Alignment.Center,
+                ) { Text("✕", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color.White) }
+
+                Column {
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                        Canvas(Modifier.size(18.dp)) {
+                            drawCircle(color = Color.White, style = androidx.compose.ui.graphics.drawscope.Stroke(2.5f))
+                            drawLine(Color.White, Offset(size.width * 0.22f, size.height * 0.78f),
+                                Offset(size.width * 0.78f, size.height * 0.22f), strokeWidth = 2.5f, cap = StrokeCap.Round)
+                        }
+                        Text("Remove Ads", fontSize = 17.sp, fontWeight = FontWeight.ExtraBold, color = Color.White)
+                    }
+                    Spacer(Modifier.height(4.dp))
+                    Text("Use the app ad-free with a one-time payment.", fontSize = 12.sp, color = Color.White.copy(alpha = 0.9f))
+                }
+            }
+
+            Column(
+                modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
+                verticalArrangement = Arrangement.spacedBy(10.dp),
+            ) {
+                // Price display
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(14.dp))
+                        .background(Color(0xFFF5F0FF))
+                        .padding(horizontal = 16.dp, vertical = 12.dp),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    Column {
+                        Text("One-time price", fontSize = 11.sp, color = Color(0xFF6D28D9), fontWeight = FontWeight.SemiBold)
+                        Text("Permanent ad removal", fontSize = 10.sp, color = Color(0xFF9F67F5))
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text("$1", fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF3B0764))
+                        Text("200,000 تومان", fontSize = 11.sp, color = Color(0xFF6D28D9), fontWeight = FontWeight.SemiBold)
+                    }
+                }
+
+                // Info box
+                Row(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(12.dp))
+                        .background(Color(0xFF7C3AED).copy(alpha = 0.09f))
+                        .padding(horizontal = 12.dp, vertical = 10.dp),
+                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                ) {
+                    Text("ℹ", fontSize = 13.sp, color = Color(0xFF7C3AED))
+                    Text(
+                        "Log in, then go to Profile → Payment to submit your receipt and remove ads permanently.",
+                        fontSize = 11.sp, color = Color(0xFF4C1D95), lineHeight = 17.sp, fontWeight = FontWeight.Medium,
+                    )
+                }
+
+                Box(
+                    modifier = Modifier
+                        .fillMaxWidth()
+                        .clip(RoundedCornerShape(13.dp))
+                        .background(Brush.linearGradient(listOf(Color(0xFF9F67F5), Color(0xFF7C3AED))))
                         .clickable { onGoToPayment() }
                         .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center,

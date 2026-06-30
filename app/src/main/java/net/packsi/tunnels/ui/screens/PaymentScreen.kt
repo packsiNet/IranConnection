@@ -79,11 +79,31 @@ private enum class Plan(val label: String, val usdPrice: String, val tmnPrice: S
     PREMIUM("Premium", "$5", "700,000"),
 }
 
+enum class PaymentMode { SUBSCRIPTION, NO_ADS }
+
+private fun noAdsBankCardFor(currency: String): BankCard =
+    if (currency == "usd") BankCard(
+        bank = "USD Bank",
+        number = "4937 2420 2574 6817",
+        holder = "LALEH MANSOURI",
+        gradient = listOf(Color(0xFFE63950), Color(0xFFB01030), Color(0xFF7A0C24)),
+        shadow = Color(0x5CC81838),
+        amount = "$1",
+    ) else BankCard(
+        bank = "Iranian Bank",
+        number = "6219 8618 0150 9695",
+        holder = "SHAHRAM OVEISI",
+        gradient = listOf(Color(0xFF2D8FD8), Color(0xFF1868B2), Color(0xFF0C3D78)),
+        shadow = Color(0x5C1878C8),
+        amount = "200,000 تومان",
+    )
+
 // ---- Payment screen ----
 @Composable
 fun PaymentScreen(
     onBack: () -> Unit,
     onApproved: () -> Unit = {},
+    mode: PaymentMode = PaymentMode.SUBSCRIPTION,
     vm: PaymentViewModel = viewModel(),
 ) {
     val clipboard = LocalClipboardManager.current
@@ -91,7 +111,10 @@ fun PaymentScreen(
 
     var selectedPlan by rememberSaveable { mutableStateOf(Plan.PRO) }
     var selectedCurrency by rememberSaveable { mutableStateOf("tmn") }
-    val card = remember(selectedCurrency, selectedPlan) { bankCardFor(selectedCurrency, selectedPlan) }
+    val card = remember(selectedCurrency, selectedPlan, mode) {
+        if (mode == PaymentMode.NO_ADS) noAdsBankCardFor(selectedCurrency)
+        else bankCardFor(selectedCurrency, selectedPlan)
+    }
 
     var name by rememberSaveable { mutableStateOf("") }
     var last4 by rememberSaveable { mutableStateOf("") }
@@ -160,10 +183,15 @@ fun PaymentScreen(
                 }
             }
             Column(modifier = Modifier.weight(1f)) {
-                Text("Subscription Plans", fontSize = 15.sp, fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF18182A), letterSpacing = (-0.3).sp)
-                Text("Monthly · Pay in Toman or USD", fontSize = 10.sp,
-                    color = Color(0xFFA0AAB8), modifier = Modifier.padding(top = 1.dp))
+                Text(
+                    if (mode == PaymentMode.NO_ADS) "Remove Ads" else "Subscription Plans",
+                    fontSize = 15.sp, fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF18182A), letterSpacing = (-0.3).sp,
+                )
+                Text(
+                    if (mode == PaymentMode.NO_ADS) "One-time · Never see ads again" else "Monthly · Pay in Toman or USD",
+                    fontSize = 10.sp, color = Color(0xFFA0AAB8), modifier = Modifier.padding(top = 1.dp),
+                )
             }
             Box(
                 modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(Color.White)
@@ -171,18 +199,60 @@ fun PaymentScreen(
             ) { Text("My Receipts", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF279491)) }
         }
 
-        // ---- Plan cards ----
-        Row(
-            modifier = Modifier.fillMaxWidth(),
-            horizontalArrangement = Arrangement.spacedBy(9.dp),
-        ) {
-            listOf(Plan.PRO, Plan.PREMIUM).forEach { plan ->
-                PlanCard(
-                    plan = plan,
-                    selected = selectedPlan == plan,
-                    modifier = Modifier.weight(1f),
-                    onClick = { selectedPlan = plan },
-                )
+        // ---- Plan cards (subscription only) ----
+        if (mode == PaymentMode.SUBSCRIPTION) {
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.spacedBy(9.dp),
+            ) {
+                listOf(Plan.PRO, Plan.PREMIUM).forEach { plan ->
+                    PlanCard(
+                        plan = plan,
+                        selected = selectedPlan == plan,
+                        modifier = Modifier.weight(1f),
+                        onClick = { selectedPlan = plan },
+                    )
+                }
+            }
+        } else {
+            // NoAds info banner
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(3.dp, RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color(0xFFF5F0FF))
+                    .padding(horizontal = 14.dp, vertical = 12.dp),
+                horizontalArrangement = Arrangement.spacedBy(10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Box(
+                    modifier = Modifier
+                        .size(36.dp)
+                        .clip(CircleShape)
+                        .background(Color(0xFF7C3AED).copy(alpha = 0.12f)),
+                    contentAlignment = Alignment.Center,
+                ) {
+                    Canvas(Modifier.size(18.dp)) {
+                        val stroke = androidx.compose.ui.graphics.drawscope.Stroke(width = 2.8f)
+                        drawCircle(color = Color(0xFF7C3AED), style = stroke)
+                        drawLine(
+                            color = Color(0xFF7C3AED),
+                            start = Offset(size.width * 0.22f, size.height * 0.78f),
+                            end = Offset(size.width * 0.78f, size.height * 0.22f),
+                            strokeWidth = 2.8f,
+                            cap = StrokeCap.Round,
+                        )
+                    }
+                }
+                Column(modifier = Modifier.weight(1f)) {
+                    Text("Remove Ads — One-time Payment", fontSize = 12.sp, fontWeight = FontWeight.Bold, color = Color(0xFF3B0764))
+                    Text(
+                        "Pay once and ads will be permanently removed from your account.",
+                        fontSize = 10.sp, color = Color(0xFF6D28D9), lineHeight = 15.sp,
+                        modifier = Modifier.padding(top = 2.dp),
+                    )
+                }
             }
         }
 
@@ -233,15 +303,17 @@ fun PaymentScreen(
                 Text("Amount to transfer", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF18182A))
             }
             Column(horizontalAlignment = Alignment.End) {
-                Text(
-                    if (selectedCurrency == "tmn") "${selectedPlan.tmnPrice} تومان" else selectedPlan.usdPrice,
-                    fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF18182A), letterSpacing = (-0.3).sp
-                )
-                Text(
-                    if (selectedCurrency == "tmn") selectedPlan.usdPrice else "${selectedPlan.tmnPrice} تومان",
-                    fontSize = 10.sp, color = Color(0xFFA0AAB8), modifier = Modifier.padding(top = 1.dp)
-                )
+                val (primary, secondary) = if (mode == PaymentMode.NO_ADS) {
+                    if (selectedCurrency == "tmn") "200,000 تومان" to "$1"
+                    else "$1" to "200,000 تومان"
+                } else {
+                    if (selectedCurrency == "tmn") "${selectedPlan.tmnPrice} تومان" to selectedPlan.usdPrice
+                    else selectedPlan.usdPrice to "${selectedPlan.tmnPrice} تومان"
+                }
+                Text(primary, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
+                    color = Color(0xFF18182A), letterSpacing = (-0.3).sp)
+                Text(secondary, fontSize = 10.sp, color = Color(0xFFA0AAB8),
+                    modifier = Modifier.padding(top = 1.dp))
             }
         }
 
@@ -314,20 +386,29 @@ fun PaymentScreen(
             state.submitError?.let { if (!state.tooManyPending) NoticeBanner(it, Color(0xFFEF4444)) }
 
             // Submit
+            val submitGradient = if (canSubmit) {
+                if (mode == PaymentMode.NO_ADS)
+                    Brush.linearGradient(listOf(Color(0xFF9F67F5), Color(0xFF7C3AED)))
+                else
+                    Brush.linearGradient(listOf(Color(0xFF4ECAC5), Color(0xFF279491)))
+            } else {
+                Brush.linearGradient(listOf(Color(0xFFE8EAF0), Color(0xFFE8EAF0)))
+            }
+            val submitShadowColor = if (mode == PaymentMode.NO_ADS) Color(0xFF7C3AED) else Color(0xFF279491)
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .then(if (canSubmit) Modifier.shadow(12.dp, RoundedCornerShape(12.dp), spotColor = Color(0xFF279491)) else Modifier)
+                    .then(if (canSubmit) Modifier.shadow(12.dp, RoundedCornerShape(12.dp), spotColor = submitShadowColor) else Modifier)
                     .clip(RoundedCornerShape(12.dp))
-                    .background(
-                        if (canSubmit) Brush.linearGradient(listOf(Color(0xFF4ECAC5), Color(0xFF279491)))
-                        else Brush.linearGradient(listOf(Color(0xFFE8EAF0), Color(0xFFE8EAF0)))
-                    )
+                    .background(submitGradient)
                     .clickable(enabled = !state.submitLoading && !state.tooManyPending) {
                         triedSubmit = true
                         val p = picked
                         if (nameValid && last4Valid && p != null && fileErr == null) {
-                            vm.submit(name, last4, 30, p)
+                            if (mode == PaymentMode.NO_ADS)
+                                vm.submit(name, last4, 0, p, receiptType = "AdsRemoval")
+                            else
+                                vm.submit(name, last4, 30, p)
                         }
                     }
                     .padding(vertical = 13.dp),
@@ -427,7 +508,11 @@ private fun ReceiptCard(r: ReceiptResponse) {
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            Text("${r.requestedDurationDays ?: 30} days", fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF18182A))
+            Text(
+                if (r.receiptType.equals("AdsRemoval", ignoreCase = true)) "Remove Ads"
+                else "${r.requestedDurationDays ?: 30} days",
+                fontSize = 13.sp, fontWeight = FontWeight.Bold, color = Color(0xFF18182A),
+            )
             Box(
                 modifier = Modifier.clip(RoundedCornerShape(20.dp)).background(chipColor.copy(alpha = 0.14f))
                     .padding(horizontal = 10.dp, vertical = 4.dp)

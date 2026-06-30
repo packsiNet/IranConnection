@@ -25,6 +25,8 @@ data class VpnUiState(
     val serverIp: String? = null,
     val errorMessage: String? = null,
     val browserVpnEnabled: Boolean = false,
+    /** Non-null while an ad-gated session is active. Counts down to 0 then auto-disconnects. */
+    val adSessionRemaining: Long? = null,
 ) {
     val connected: Boolean get() = status == VpnStatus.CONNECTED
     val statusLabel: String get() = when (status) {
@@ -44,6 +46,10 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
     private val _state = MutableStateFlow(VpnUiState())
     val state: StateFlow<VpnUiState> = _state.asStateFlow()
 
+    companion object {
+        const val AD_SESSION_SECONDS = 1800L // 30 minutes
+    }
+
     init {
         viewModelScope.launch {
             val wasConnected   = prefs.connected.first()
@@ -58,16 +64,30 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
                 selectedServerId = serverId,
                 loaded = true,
                 browserVpnEnabled = browserEnabled,
+                // adSessionRemaining is not persisted — restored sessions run in normal (no-countdown) mode
             )
             if (!isNowConnected && wasConnected) {
                 prefs.setConnected(false)
             }
         }
+
+        // Unified timer loop: counts up in normal mode, counts down in ad session mode.
         viewModelScope.launch {
             while (true) {
                 delay(1000)
                 val s = _state.value
-                if (s.connected) {
+                if (!s.connected) continue
+
+                val rem = s.adSessionRemaining
+                if (rem != null) {
+                    if (rem <= 1) {
+                        // Ad session expired — clear remaining first to prevent re-entry, then disconnect.
+                        _state.value = s.copy(adSessionRemaining = null, seconds = 0L)
+                        stopTunnel()
+                    } else {
+                        _state.value = s.copy(adSessionRemaining = rem - 1)
+                    }
+                } else {
                     val ns = s.seconds + 1
                     _state.value = s.copy(seconds = ns)
                     prefs.setSeconds(ns)
@@ -83,10 +103,11 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
         ConnectionLog.clear()
         ConnectionLog.add("=== startTunnel ===")
         val context = getApplication<Application>()
-        // Show CONNECTING instantly so the button feels responsive.
-        _state.value = _state.value.copy(status = VpnStatus.CONNECTING, seconds = 0L, serverIp = null, errorMessage = null)
+        _state.value = _state.value.copy(
+            status = VpnStatus.CONNECTING, seconds = 0L, serverIp = null,
+            errorMessage = null, adSessionRemaining = null,
+        )
         connectingJob = viewModelScope.launch {
-            // Read prefs + start the tunnel off the main thread.
             val serverIp = withContext(Dispatchers.IO) {
                 val endpoint = context.getSharedPreferences("wireguard", android.content.Context.MODE_PRIVATE)
                     .getString("endpoint", null)
@@ -98,7 +119,6 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
                 }
             }
             _state.value = _state.value.copy(serverIp = serverIp)
-            // Poll every 500ms, timeout 15s. Also watch for early service failures.
             repeat(30) { i ->
                 delay(500)
                 if (WireGuardManager.earlyFail) {
@@ -123,29 +143,80 @@ class VpnViewModel(app: Application) : AndroidViewModel(app) {
         }
     }
 
-    /** Lets the user cancel a connect attempt that's taking too long, instead of being stuck waiting on it. */
+    /**
+     * Same as [startTunnel] but starts a 30-minute ad-gated session on success.
+     * The countdown timer drives auto-disconnect when it reaches zero.
+     */
+    fun startTunnelInAdMode() {
+        ConnectionLog.clear()
+        ConnectionLog.add("=== startTunnelInAdMode ===")
+        val context = getApplication<Application>()
+        _state.value = _state.value.copy(
+            status = VpnStatus.CONNECTING, seconds = 0L, serverIp = null,
+            errorMessage = null, adSessionRemaining = null,
+        )
+        connectingJob = viewModelScope.launch {
+            val serverIp = withContext(Dispatchers.IO) {
+                val endpoint = context.getSharedPreferences("wireguard", android.content.Context.MODE_PRIVATE)
+                    .getString("endpoint", null)
+                ConnectionLog.add("ViewModel: endpoint=$endpoint")
+                WireGuardManager.connect(context)
+                endpoint?.let { ep ->
+                    if (ep.startsWith("[")) ep.substringBefore("]").removePrefix("[")
+                    else ep.substringBeforeLast(":").takeIf { it.isNotEmpty() } ?: ep
+                }
+            }
+            _state.value = _state.value.copy(serverIp = serverIp)
+            repeat(30) { i ->
+                delay(500)
+                if (WireGuardManager.earlyFail) {
+                    val err = WireGuardManager.lastError ?: "Connection failed."
+                    ConnectionLog.add("FAILED early: $err")
+                    _state.value = _state.value.copy(status = VpnStatus.FAILED, errorMessage = err)
+                    return@launch
+                }
+                val connected = withContext(Dispatchers.IO) { WireGuardManager.isConnected() }
+                if (connected) {
+                    ConnectionLog.add("CONNECTED (ad mode) after ${(i + 1) * 500}ms")
+                    _state.value = _state.value.copy(
+                        status = VpnStatus.CONNECTED,
+                        adSessionRemaining = AD_SESSION_SECONDS,
+                    )
+                    prefs.setConnected(true)
+                    return@launch
+                }
+            }
+            ConnectionLog.add("FAILED: not connected after 15s polling")
+            _state.value = _state.value.copy(
+                status = VpnStatus.FAILED,
+                errorMessage = WireGuardManager.lastError ?: "Connection timed out.",
+            )
+        }
+    }
+
     fun cancelConnecting() {
         if (_state.value.status != VpnStatus.CONNECTING) return
         ConnectionLog.add("=== cancelConnecting ===")
-        // Stop the in-flight connect poll first so it can't overwrite the DISCONNECTING/DISCONNECTED
-        // state that stopTunnel() is about to set.
         connectingJob?.cancel()
         stopTunnel()
     }
 
     fun stopTunnel() {
         val context = getApplication<Application>()
-        // Show DISCONNECTING instantly; tunnel teardown runs in background.
         _state.value = _state.value.copy(status = VpnStatus.DISCONNECTING)
         viewModelScope.launch {
             withContext(Dispatchers.IO) { WireGuardManager.disconnect(context) }
-            // Poll isRunning every 500ms, timeout 15s.
             var i = 0
             while (i < 30 && withContext(Dispatchers.IO) { WireGuardManager.isConnected() }) {
                 delay(500)
                 i++
             }
-            _state.value = _state.value.copy(status = VpnStatus.DISCONNECTED, seconds = 0L, serverIp = null)
+            _state.value = _state.value.copy(
+                status = VpnStatus.DISCONNECTED,
+                seconds = 0L,
+                serverIp = null,
+                adSessionRemaining = null,
+            )
             prefs.setConnected(false)
         }
     }

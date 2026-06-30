@@ -45,10 +45,18 @@ private val Red         = Color(0xFFEF4444)
 
 // ---- Main screen ----
 @Composable
-fun ProfileScreen(vm: AuthViewModel = viewModel(), onSignOut: () -> Unit = {}, openPaymentOnLoad: Boolean = false, onPaymentOpened: () -> Unit = {}) {
+fun ProfileScreen(
+    vm: AuthViewModel = viewModel(),
+    onSignOut: () -> Unit = {},
+    openPaymentOnLoad: Boolean = false,
+    onPaymentOpened: () -> Unit = {},
+    openNoAdsPaymentOnLoad: Boolean = false,
+    onNoAdsPaymentOpened: () -> Unit = {},
+) {
     val state by vm.state.collectAsState()
 
     var showPayment by rememberSaveable { mutableStateOf(false) }
+    var showNoAdsPayment by rememberSaveable { mutableStateOf(false) }
     var showEdit by rememberSaveable { mutableStateOf(false) }
 
     LaunchedEffect(Unit) {
@@ -58,6 +66,10 @@ fun ProfileScreen(vm: AuthViewModel = viewModel(), onSignOut: () -> Unit = {}, o
 
     LaunchedEffect(openPaymentOnLoad) {
         if (openPaymentOnLoad) { showPayment = true; onPaymentOpened() }
+    }
+
+    LaunchedEffect(openNoAdsPaymentOnLoad) {
+        if (openNoAdsPaymentOnLoad) { showNoAdsPayment = true; onNoAdsPaymentOpened() }
     }
 
     Box(
@@ -78,6 +90,13 @@ fun ProfileScreen(vm: AuthViewModel = viewModel(), onSignOut: () -> Unit = {}, o
         if (showPayment) {
             PaymentScreen(
                 onBack = { showPayment = false },
+                onApproved = { vm.loadSubscription() },
+            )
+        }
+        if (showNoAdsPayment) {
+            PaymentScreen(
+                mode = PaymentMode.NO_ADS,
+                onBack = { showNoAdsPayment = false },
                 onApproved = { vm.loadSubscription() },
             )
         }

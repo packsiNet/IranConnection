@@ -13,6 +13,7 @@ data class ReceiptResponse(
     val submittedAt: String?,
     val adminNote: String?,
     val reviewedAt: String?,
+    val receiptType: String? = null,
 )
 
 /** Local bundle of a picked receipt file, read off the content resolver. */

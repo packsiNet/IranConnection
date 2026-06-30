@@ -20,6 +20,7 @@ object PaymentRepository {
         lastFourDigits: String,
         durationDays: Int,
         file: ReceiptFile,
+        receiptType: String = "PremiumUpgrade",
     ): Result<String> = withContext(Dispatchers.IO) {
         try {
             val filePart = MultipartBody.Part.createFormData(
@@ -31,6 +32,7 @@ object PaymentRepository {
                 payerFullName = payerFullName.toRequestBody(TEXT),
                 lastFourDigits = lastFourDigits.toRequestBody(TEXT),
                 durationDays = durationDays.toString().toRequestBody(TEXT),
+                receiptType = receiptType.toRequestBody(TEXT),
                 receiptFile = filePart,
             )
             if (resp.isSuccessful) {

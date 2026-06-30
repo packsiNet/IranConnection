@@ -20,6 +20,7 @@ interface PaymentApi {
         @Part("payerFullName") payerFullName: RequestBody,
         @Part("lastFourDigits") lastFourDigits: RequestBody,
         @Part("durationDays") durationDays: RequestBody,
+        @Part("receiptType") receiptType: RequestBody,
         @Part receiptFile: MultipartBody.Part,
     ): Response<String>
 

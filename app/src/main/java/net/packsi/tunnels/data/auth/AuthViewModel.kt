@@ -15,6 +15,7 @@ data class AuthUiState(
     val isLoggedIn: Boolean = false,
     val email: String = "",
     val fullName: String = "",
+    val adsEnabled: Boolean = true,
     // login
     val loginLoading: Boolean = false,
     val loginError: String? = null,
@@ -64,6 +65,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
             isLoggedIn = TokenStore.loggedIn.value,
             email = TokenStore.email,
             fullName = TokenStore.fullName,
+            adsEnabled = TokenStore.adsEnabled,
         )
     )
     val state: StateFlow<AuthUiState> = _state.asStateFlow()
@@ -91,6 +93,7 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                         isLoggedIn = true,
                         email = r.email ?: email.trim(),
                         fullName = r.fullName ?: "",
+                        adsEnabled = r.adsEnabled,
                     )
                 },
                 onFailure = { e ->

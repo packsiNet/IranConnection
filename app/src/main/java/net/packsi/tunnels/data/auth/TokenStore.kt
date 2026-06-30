@@ -20,6 +20,7 @@ object TokenStore {
     private const val K_EMAIL = "email"
     private const val K_FULL_NAME = "full_name"
     private const val K_PLAN = "plan"
+    private const val K_ADS_ENABLED = "ads_enabled"
 
     private val _loggedIn = MutableStateFlow(false)
     val loggedIn: StateFlow<Boolean> = _loggedIn.asStateFlow()
@@ -34,6 +35,7 @@ object TokenStore {
     val email: String get() = prefs.getString(K_EMAIL, "") ?: ""
     val fullName: String get() = prefs.getString(K_FULL_NAME, "") ?: ""
     val plan: String get() = prefs.getString(K_PLAN, "") ?: ""
+    val adsEnabled: Boolean get() = prefs.getBoolean(K_ADS_ENABLED, true)
 
     /** Persist tokens + cached identity from a login/refresh response. */
     fun saveAuth(r: AuthResponse) {
@@ -44,6 +46,7 @@ object TokenStore {
             r.email?.let { putString(K_EMAIL, it) }
             r.fullName?.let { putString(K_FULL_NAME, it) }
             r.plan?.let { putString(K_PLAN, it) }
+            putBoolean(K_ADS_ENABLED, r.adsEnabled)
             apply()
         }
         _loggedIn.value = true

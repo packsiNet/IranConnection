@@ -72,7 +72,7 @@ class PaymentViewModel(app: Application) : AndroidViewModel(app) {
         _state.value = _state.value.copy(submitError = null, successMessage = null)
     }
 
-    fun submit(payerFullName: String, lastFourDigits: String, durationDays: Int, file: PickedReceipt) {
+    fun submit(payerFullName: String, lastFourDigits: String, durationDays: Int, file: PickedReceipt, receiptType: String = "PremiumUpgrade") {
         if (_state.value.submitLoading) return
         _state.value = _state.value.copy(submitLoading = true, submitError = null, successMessage = null)
         viewModelScope.launch {
@@ -98,6 +98,7 @@ class PaymentViewModel(app: Application) : AndroidViewModel(app) {
                 lastFourDigits = lastFourDigits,
                 durationDays = durationDays,
                 file = ReceiptFile(file.fileName, file.mimeType, bytes),
+                receiptType = receiptType,
             ).fold(
                 onSuccess = { msg ->
                     _state.value = _state.value.copy(

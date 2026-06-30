@@ -16,6 +16,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.navigationBarsPadding
 import androidx.compose.foundation.layout.statusBarsPadding
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -26,9 +27,10 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.ViewModelProvider
 import androidx.lifecycle.viewmodel.compose.viewModel
+import net.packsi.tunnels.ads.AdManager
 import net.packsi.tunnels.data.VpnStatus
 import net.packsi.tunnels.data.VpnViewModel
-import net.packsi.tunnels.data.auth.ApiClient
+import net.packsi.tunnels.data.auth.AuthViewModel
 import net.packsi.tunnels.data.deviceauth.AppStartState
 import net.packsi.tunnels.data.deviceauth.DeviceAuthViewModel
 import net.packsi.tunnels.data.UpdateInfo
@@ -43,8 +45,6 @@ import net.packsi.tunnels.ui.screens.ProfileScreen
 import net.packsi.tunnels.ui.screens.SplashScreen
 import net.packsi.tunnels.ui.theme.AppColors
 import net.packsi.tunnels.ui.theme.SafeTunnelsTheme
-import androidx.compose.runtime.LaunchedEffect
-import androidx.compose.ui.unit.dp
 
 class MainActivity : ComponentActivity() {
 
@@ -54,8 +54,6 @@ class MainActivity : ComponentActivity() {
             navigationBarStyle = SystemBarStyle.light(android.graphics.Color.TRANSPARENT, android.graphics.Color.TRANSPARENT),
         )
         super.onCreate(savedInstanceState)
-
-        ApiClient.init(applicationContext)
 
         setContent {
             SafeTunnelsTheme {
@@ -101,6 +99,17 @@ private fun AppRoot(
     var tab by remember { mutableStateOf(NavTab.HOME) }
     val context = LocalContext.current
 
+    // Auth state — used to determine whether to show ads before connecting.
+    val userAuthVm: AuthViewModel = viewModel()
+    val userAuthState by userAuthVm.state.collectAsState()
+    // Ads are shown only when the admin has enabled the ads system AND the user hasn't paid to remove them.
+    val shouldShowAds = userAuthState.adsEnabled && (userAuthState.subscription?.showAds ?: true)
+
+    // Preload the first interstitial ad as soon as the screen is ready.
+    LaunchedEffect(Unit) {
+        AdManager.preload(context)
+    }
+
     var updateInfo by remember { mutableStateOf<UpdateInfo>(UpdateInfo.UpToDate) }
     var showUpdateDialog by remember { mutableStateOf(false) }
     LaunchedEffect(Unit) {
@@ -122,14 +131,26 @@ private fun AppRoot(
         )
     }
 
+    // Whether the next VPN permission grant should start an ad-gated session.
+    var pendingAdConnect by remember { mutableStateOf(false) }
+
     val vpnPermissionLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.StartActivityForResult()
     ) { result ->
-        if (result.resultCode == Activity.RESULT_OK) vm.startTunnel()
+        if (result.resultCode == Activity.RESULT_OK) {
+            if (pendingAdConnect) {
+                pendingAdConnect = false
+                AdManager.showAd(context as Activity) { vm.startTunnelInAdMode() }
+            } else {
+                vm.startTunnel()
+            }
+        }
+        pendingAdConnect = false
     }
 
     var showLogPanel by remember { mutableStateOf(false) }
     var openPayment by remember { mutableStateOf(false) }
+    var openNoAdsPayment by remember { mutableStateOf(false) }
 
     val buttonEnabled = state.status != VpnStatus.DISCONNECTING
     val onToggle: () -> Unit = {
@@ -138,9 +159,18 @@ private fun AppRoot(
             VpnStatus.CONNECTING -> vm.cancelConnecting()
             VpnStatus.DISCONNECTING -> {}
             else -> {
-                val intent = VpnService.prepare(context)
-                if (intent == null) vm.startTunnel()
-                else vpnPermissionLauncher.launch(intent)
+                // DISCONNECTED or FAILED
+                val vpnIntent = VpnService.prepare(context)
+                if (vpnIntent != null) {
+                    // VPN permission not yet granted — request it first, then handle ad flow in launcher.
+                    if (shouldShowAds) pendingAdConnect = true
+                    vpnPermissionLauncher.launch(vpnIntent)
+                } else if (shouldShowAds) {
+                    // VPN permission already granted — show ad, then connect in ad-gated mode.
+                    AdManager.showAd(context as Activity) { vm.startTunnelInAdMode() }
+                } else {
+                    vm.startTunnel()
+                }
             }
         }
     }
@@ -164,14 +194,22 @@ private fun AppRoot(
                         onShowLogs = { showLogPanel = true },
                         onGoToLogin = { tab = NavTab.PROFILE },
                         onGoToPayment = { tab = NavTab.PROFILE; openPayment = true },
+                        onGoToNoAdsPayment = { tab = NavTab.PROFILE; openNoAdsPayment = true },
                         configStatus = ConfigFetchStatus.Success,
                         buttonEnabled = buttonEnabled,
                         errorMessage = state.errorMessage,
                         browserVpnEnabled = state.browserVpnEnabled,
                         onBrowserVpnChange = { vm.setBrowserVpn(it) },
+                        adSessionRemaining = state.adSessionRemaining,
                     )
                     NavTab.APPS -> AppsScreen(onClose = { tab = NavTab.HOME })
-NavTab.PROFILE -> ProfileScreen(onSignOut = onSignOut, openPaymentOnLoad = openPayment, onPaymentOpened = { openPayment = false })
+                    NavTab.PROFILE -> ProfileScreen(
+                        onSignOut = onSignOut,
+                        openPaymentOnLoad = openPayment,
+                        onPaymentOpened = { openPayment = false },
+                        openNoAdsPaymentOnLoad = openNoAdsPayment,
+                        onNoAdsPaymentOpened = { openNoAdsPayment = false },
+                    )
                 }
             }
             AppBottomNav(

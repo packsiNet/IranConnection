@@ -11,6 +11,7 @@ data class SubscriptionResponse(
     val expireDate: String?,
     val daysRemaining: Int?,
     val isActive: Boolean = false,
+    val showAds: Boolean = true,
 )
 
 /**

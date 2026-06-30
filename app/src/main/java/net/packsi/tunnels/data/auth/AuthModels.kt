@@ -57,6 +57,8 @@ data class AuthResponse(
     val fullName: String?,
     val plan: String?,
     val isEmailVerified: Boolean = false,
+    val showAds: Boolean = true,
+    val adsEnabled: Boolean = true,
 )
 
 data class UserProfile(
@@ -75,6 +77,7 @@ data class Subscription(
     val expireDate: String?,
     val daysRemaining: Int?,
     val isActive: Boolean = false,
+    val showAds: Boolean = true,
 )
 
 // ---- Error body: { "error": "..." } ----
