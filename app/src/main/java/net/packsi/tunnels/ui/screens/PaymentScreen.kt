@@ -56,28 +56,22 @@ private data class BankCard(
     val amount: String,
 )
 
-private fun bankCardFor(currency: String, plan: Plan): BankCard =
+private fun subscriptionBankCardFor(currency: String): BankCard =
     if (currency == "usd") BankCard(
         bank = "USD Bank",
         number = "4937 2420 2574 6817",
         holder = "LALEH MANSOURI",
         gradient = listOf(Color(0xFFE63950), Color(0xFFB01030), Color(0xFF7A0C24)),
         shadow = Color(0x5CC81838),
-        amount = plan.usdPrice,
+        amount = "$5",
     ) else BankCard(
         bank = "Iranian Bank",
         number = "6219 8618 0150 9695",
         holder = "SHAHRAM OVEISI",
         gradient = listOf(Color(0xFF2D8FD8), Color(0xFF1868B2), Color(0xFF0C3D78)),
         shadow = Color(0x5C1878C8),
-        amount = "${plan.tmnPrice} تومان",
+        amount = "700,000 تومان",
     )
-
-// ---- Plan definitions ----
-private enum class Plan(val label: String, val usdPrice: String, val tmnPrice: String) {
-    PRO("PRO", "$3", "500,000"),
-    PREMIUM("Premium", "$5", "700,000"),
-}
 
 enum class PaymentMode { SUBSCRIPTION, NO_ADS }
 
@@ -104,16 +98,16 @@ fun PaymentScreen(
     onBack: () -> Unit,
     onApproved: () -> Unit = {},
     mode: PaymentMode = PaymentMode.SUBSCRIPTION,
+    initialCurrency: String = "tmn",
     vm: PaymentViewModel = viewModel(),
 ) {
     val clipboard = LocalClipboardManager.current
     val state by vm.state.collectAsState()
 
-    var selectedPlan by rememberSaveable { mutableStateOf(Plan.PRO) }
-    var selectedCurrency by rememberSaveable { mutableStateOf("tmn") }
-    val card = remember(selectedCurrency, selectedPlan, mode) {
+    var selectedCurrency by rememberSaveable { mutableStateOf(initialCurrency) }
+    val card = remember(selectedCurrency, mode) {
         if (mode == PaymentMode.NO_ADS) noAdsBankCardFor(selectedCurrency)
-        else bankCardFor(selectedCurrency, selectedPlan)
+        else subscriptionBankCardFor(selectedCurrency)
     }
 
     var name by rememberSaveable { mutableStateOf("") }
@@ -199,23 +193,46 @@ fun PaymentScreen(
             ) { Text("My Receipts", fontSize = 10.sp, fontWeight = FontWeight.Bold, color = Color(0xFF279491)) }
         }
 
-        // ---- Plan cards (subscription only) ----
+        // ---- Subscription: compact Premium summary ----
         if (mode == PaymentMode.SUBSCRIPTION) {
             Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.spacedBy(9.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(4.dp, RoundedCornerShape(16.dp))
+                    .clip(RoundedCornerShape(16.dp))
+                    .background(Color.White)
+                    .padding(horizontal = 14.dp, vertical = 14.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
             ) {
-                listOf(Plan.PRO, Plan.PREMIUM).forEach { plan ->
-                    PlanCard(
-                        plan = plan,
-                        selected = selectedPlan == plan,
-                        modifier = Modifier.weight(1f),
-                        onClick = { selectedPlan = plan },
+                Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                    Box(
+                        modifier = Modifier
+                            .clip(RoundedCornerShape(8.dp))
+                            .background(Color(0xFFFFF4D6))
+                            .padding(horizontal = 8.dp, vertical = 4.dp),
+                    ) {
+                        Text("⭐  Premium", fontSize = 11.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFFB07210))
+                    }
+                    Text("Monthly Subscription", fontSize = 10.sp, color = Color(0xFFA0AAB8))
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        if (selectedCurrency == "tmn") "700,000 تومان" else "$5",
+                        fontSize = 16.sp, fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF18182A), letterSpacing = (-0.3).sp,
+                    )
+                    Text(
+                        if (selectedCurrency == "tmn") "$5" else "700,000 تومان",
+                        fontSize = 10.sp, color = Color(0xFFA0AAB8),
+                        modifier = Modifier.padding(top = 1.dp),
                     )
                 }
             }
-        } else {
-            // NoAds info banner
+        }
+
+        // ---- No-Ads: info banner + currency selector ----
+        if (mode == PaymentMode.NO_ADS) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
@@ -254,66 +271,60 @@ fun PaymentScreen(
                     )
                 }
             }
-        }
 
-        // ---- Currency selector ----
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(3.dp, RoundedCornerShape(14.dp))
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color.White)
-                .padding(horizontal = 14.dp, vertical = 10.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween,
-        ) {
-            Text("Pay with", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF6B7A99))
-            Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
-                listOf("tmn" to "Toman", "usd" to "USD").forEach { (code, label) ->
-                    val active = selectedCurrency == code
-                    Box(
-                        modifier = Modifier
-                            .clip(RoundedCornerShape(10.dp))
-                            .background(if (active) Color(0xFF279491) else Color(0xFFF6F7FA))
-                            .border(1.5.dp, if (active) Color(0xFF279491) else Color(0xFFEAECF2), RoundedCornerShape(10.dp))
-                            .clickable { selectedCurrency = code }
-                            .padding(horizontal = 16.dp, vertical = 8.dp),
-                        contentAlignment = Alignment.Center
-                    ) {
-                        Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold,
-                            color = if (active) Color.White else Color(0xFF6B7A99))
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(3.dp, RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.White)
+                    .padding(horizontal = 14.dp, vertical = 10.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Text("Pay with", fontSize = 11.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF6B7A99))
+                Row(horizontalArrangement = Arrangement.spacedBy(7.dp)) {
+                    listOf("tmn" to "Toman", "usd" to "USD").forEach { (code, label) ->
+                        val active = selectedCurrency == code
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(10.dp))
+                                .background(if (active) Color(0xFF279491) else Color(0xFFF6F7FA))
+                                .border(1.5.dp, if (active) Color(0xFF279491) else Color(0xFFEAECF2), RoundedCornerShape(10.dp))
+                                .clickable { selectedCurrency = code }
+                                .padding(horizontal = 16.dp, vertical = 8.dp),
+                            contentAlignment = Alignment.Center
+                        ) {
+                            Text(label, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                color = if (active) Color.White else Color(0xFF6B7A99))
+                        }
                     }
                 }
             }
-        }
 
-        // ---- Amount badge ----
-        Row(
-            modifier = Modifier
-                .fillMaxWidth()
-                .shadow(4.dp, RoundedCornerShape(14.dp))
-                .clip(RoundedCornerShape(14.dp))
-                .background(Color.White)
-                .padding(horizontal = 14.dp, vertical = 11.dp),
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.SpaceBetween
-        ) {
-            Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF3DBFBA)))
-                Text("Amount to transfer", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF18182A))
-            }
-            Column(horizontalAlignment = Alignment.End) {
-                val (primary, secondary) = if (mode == PaymentMode.NO_ADS) {
-                    if (selectedCurrency == "tmn") "200,000 تومان" to "$1"
-                    else "$1" to "200,000 تومان"
-                } else {
-                    if (selectedCurrency == "tmn") "${selectedPlan.tmnPrice} تومان" to selectedPlan.usdPrice
-                    else selectedPlan.usdPrice to "${selectedPlan.tmnPrice} تومان"
+            // Amount badge (No-Ads only)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .shadow(4.dp, RoundedCornerShape(14.dp))
+                    .clip(RoundedCornerShape(14.dp))
+                    .background(Color.White)
+                    .padding(horizontal = 14.dp, vertical = 11.dp),
+                verticalAlignment = Alignment.CenterVertically,
+                horizontalArrangement = Arrangement.SpaceBetween,
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    Box(modifier = Modifier.size(8.dp).clip(CircleShape).background(Color(0xFF3DBFBA)))
+                    Text("Amount to transfer", fontSize = 11.5.sp, fontWeight = FontWeight.SemiBold, color = Color(0xFF18182A))
                 }
-                Text(primary, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
-                    color = Color(0xFF18182A), letterSpacing = (-0.3).sp)
-                Text(secondary, fontSize = 10.sp, color = Color(0xFFA0AAB8),
-                    modifier = Modifier.padding(top = 1.dp))
+                Column(horizontalAlignment = Alignment.End) {
+                    val (primary, secondary) = if (selectedCurrency == "tmn") "200,000 تومان" to "$1"
+                        else "$1" to "200,000 تومان"
+                    Text(primary, fontSize = 14.sp, fontWeight = FontWeight.ExtraBold,
+                        color = Color(0xFF18182A), letterSpacing = (-0.3).sp)
+                    Text(secondary, fontSize = 10.sp, color = Color(0xFFA0AAB8),
+                        modifier = Modifier.padding(top = 1.dp))
+                }
             }
         }
 
@@ -536,50 +547,6 @@ private fun ReceiptRow(label: String, value: String) {
     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
         Text(label, fontSize = 10.5.sp, color = Color(0xFFA0AAB8))
         Text(value, fontSize = 10.5.sp, fontWeight = FontWeight.Medium, color = Color(0xFF18182A))
-    }
-}
-
-@Composable
-private fun PlanCard(plan: Plan, selected: Boolean, modifier: Modifier = Modifier, onClick: () -> Unit) {
-    Box(
-        modifier = modifier
-            .shadow(if (selected) 6.dp else 2.dp, RoundedCornerShape(16.dp),
-                spotColor = if (selected) Color(0x33279491) else Color(0x10000000))
-            .clip(RoundedCornerShape(16.dp))
-            .background(if (selected) Color(0xFFEFF9F9) else Color.White)
-            .border(2.dp, if (selected) Color(0xFF279491) else Color(0xFFEAECF2), RoundedCornerShape(16.dp))
-            .clickable { onClick() }
-            .padding(14.dp),
-    ) {
-        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically,
-            ) {
-                Text(plan.label, fontSize = 16.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF18182A))
-                if (selected) {
-                    Box(
-                        modifier = Modifier.size(18.dp).clip(CircleShape).background(Color(0xFF279491)),
-                        contentAlignment = Alignment.Center
-                    ) { Text("✓", fontSize = 10.sp, color = Color.White, fontWeight = FontWeight.Bold) }
-                }
-            }
-            Text(plan.usdPrice, fontSize = 24.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF279491))
-            Text("${plan.tmnPrice} تومان", fontSize = 11.sp, color = Color(0xFF6B7A99))
-            Box(
-                modifier = Modifier
-                    .clip(RoundedCornerShape(20.dp))
-                    .background(if (plan == Plan.PRO) Color(0x1A279491) else Color(0x1AF59E0B))
-                    .padding(horizontal = 8.dp, vertical = 3.dp)
-            ) {
-                Text(
-                    if (plan == Plan.PRO) "Popular" else "Best Value",
-                    fontSize = 9.sp, fontWeight = FontWeight.Bold,
-                    color = if (plan == Plan.PRO) Color(0xFF279491) else Color(0xFFF59E0B),
-                )
-            }
-        }
     }
 }
 

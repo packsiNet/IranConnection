@@ -77,7 +77,7 @@ fun HomeScreen(
     onServerCardClick: () -> Unit,
     onShowLogs: () -> Unit = {},
     onGoToLogin: () -> Unit = {},
-    onGoToPayment: () -> Unit = {},
+    onGoToPayment: (currency: String) -> Unit = {},
     onGoToNoAdsPayment: () -> Unit = {},
     configStatus: ConfigFetchStatus = ConfigFetchStatus.Success,
     buttonEnabled: Boolean = true,
@@ -198,7 +198,7 @@ fun HomeScreen(
     if (showPremiumModal) {
         PremiumModal(
             onDismiss = { showPremiumModal = false },
-            onGoToPayment = { showPremiumModal = false; onGoToPayment() },
+            onGoToPayment = { currency -> showPremiumModal = false; onGoToPayment(currency) },
         )
     }
     if (showNoAdsModal && adsEnabled) {
@@ -703,7 +703,8 @@ private fun formatTime(seconds: Long): String {
 // Premium upsell modal (opened from the Home "Premium" badge)
 // =====================================================================
 @Composable
-private fun PremiumModal(onDismiss: () -> Unit, onGoToPayment: () -> Unit) {
+private fun PremiumModal(onDismiss: () -> Unit, onGoToPayment: (currency: String) -> Unit) {
+    var selectedCurrency by remember { mutableStateOf("tmn") }
     Dialog(onDismissRequest = onDismiss, properties = DialogProperties(usePlatformDefaultWidth = false)) {
         Column(
             modifier = Modifier
@@ -746,24 +747,45 @@ private fun PremiumModal(onDismiss: () -> Unit, onGoToPayment: () -> Unit) {
                 modifier = Modifier.padding(horizontal = 16.dp, vertical = 14.dp),
                 verticalArrangement = Arrangement.spacedBy(10.dp),
             ) {
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.fillMaxWidth()) {
-                    PlanPill(modifier = Modifier.weight(1f), name = "PRO", usd = "$3", tmn = "500,000", color = Color(0xFF279491))
-                    PlanPill(modifier = Modifier.weight(1f), name = "Premium", usd = "$5", tmn = "700,000", color = Color(0xFFF59E0B))
-                }
-
+                // Currency selector + price
                 Row(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clip(RoundedCornerShape(12.dp))
-                        .background(Color(0xFF279491).copy(alpha = 0.09f))
-                        .padding(horizontal = 12.dp, vertical = 10.dp),
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically,
                 ) {
-                    Text("ℹ", fontSize = 13.sp, color = Color(0xFF279491))
-                    Text(
-                        "Log in, then go to Profile → Payment to submit your receipt and activate.",
-                        fontSize = 11.sp, color = Color(0xFF1B6B68), lineHeight = 17.sp, fontWeight = FontWeight.Medium,
-                    )
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        listOf("tmn" to "تومان", "usd" to "USD").forEach { (code, label) ->
+                            val active = selectedCurrency == code
+                            Box(
+                                modifier = Modifier
+                                    .clip(RoundedCornerShape(9.dp))
+                                    .background(if (active) Color(0xFFFFF4D6) else Color(0xFFF4F6FA))
+                                    .border(
+                                        1.5.dp,
+                                        if (active) Color(0xFFF5A620) else Color(0xFFEAECF2),
+                                        RoundedCornerShape(9.dp),
+                                    )
+                                    .clickable { selectedCurrency = code }
+                                    .padding(horizontal = 12.dp, vertical = 6.dp),
+                            ) {
+                                Text(
+                                    label, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                    color = if (active) Color(0xFFB07210) else Color(0xFF8A96A8),
+                                )
+                            }
+                        }
+                    }
+                    Column(horizontalAlignment = Alignment.End) {
+                        Text(
+                            if (selectedCurrency == "tmn") "700,000 تومان" else "$5",
+                            fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color(0xFF18182A),
+                            letterSpacing = (-0.5).sp,
+                        )
+                        Text(
+                            if (selectedCurrency == "tmn") "$5" else "700,000 تومان",
+                            fontSize = 10.sp, color = Color(0xFFA0AAB8),
+                        )
+                    }
                 }
 
                 Box(
@@ -771,7 +793,7 @@ private fun PremiumModal(onDismiss: () -> Unit, onGoToPayment: () -> Unit) {
                         .fillMaxWidth()
                         .clip(RoundedCornerShape(13.dp))
                         .background(Brush.linearGradient(listOf(Color(0xFF4ECAC5), Color(0xFF279491))))
-                        .clickable { onGoToPayment() }
+                        .clickable { onGoToPayment(selectedCurrency) }
                         .padding(vertical = 12.dp),
                     contentAlignment = Alignment.Center,
                 ) {

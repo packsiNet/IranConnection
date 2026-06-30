@@ -50,12 +50,14 @@ fun ProfileScreen(
     onSignOut: () -> Unit = {},
     openPaymentOnLoad: Boolean = false,
     onPaymentOpened: () -> Unit = {},
+    initialPaymentCurrency: String = "tmn",
     openNoAdsPaymentOnLoad: Boolean = false,
     onNoAdsPaymentOpened: () -> Unit = {},
 ) {
     val state by vm.state.collectAsState()
 
     var showPayment by rememberSaveable { mutableStateOf(false) }
+    var paymentCurrency by rememberSaveable { mutableStateOf(initialPaymentCurrency) }
     var showNoAdsPayment by rememberSaveable { mutableStateOf(false) }
     var showEdit by rememberSaveable { mutableStateOf(false) }
 
@@ -65,7 +67,11 @@ fun ProfileScreen(
     }
 
     LaunchedEffect(openPaymentOnLoad) {
-        if (openPaymentOnLoad) { showPayment = true; onPaymentOpened() }
+        if (openPaymentOnLoad) {
+            paymentCurrency = initialPaymentCurrency
+            showPayment = true
+            onPaymentOpened()
+        }
     }
 
     LaunchedEffect(openNoAdsPaymentOnLoad) {
@@ -83,7 +89,7 @@ fun ProfileScreen(
             subscriptionNotFound = state.subscriptionNotFound,
             email = state.email,
             fullName = state.fullName,
-            onPay = { showPayment = true },
+            onPay = { currency -> paymentCurrency = currency; showPayment = true },
             onEditProfile = { showEdit = true },
             onExit = { vm.logout(); onSignOut() },
         )
@@ -91,6 +97,7 @@ fun ProfileScreen(
             PaymentScreen(
                 onBack = { showPayment = false },
                 onApproved = { vm.loadSubscription() },
+                initialCurrency = paymentCurrency,
             )
         }
         if (showNoAdsPayment) {
@@ -119,7 +126,7 @@ private fun ProfileView(
     subscriptionNotFound: Boolean,
     email: String,
     fullName: String,
-    onPay: () -> Unit,
+    onPay: (currency: String) -> Unit,
     onEditProfile: () -> Unit,
     onExit: () -> Unit,
 ) {
@@ -387,7 +394,9 @@ private fun StatCard(
 
 // ---- Renew card ----
 @Composable
-private fun RenewCard(onPay: () -> Unit) {
+private fun RenewCard(onPay: (currency: String) -> Unit) {
+    var selectedCurrency by remember { mutableStateOf("tmn") }
+
     Box(
         modifier = Modifier
             .fillMaxWidth()
@@ -418,17 +427,55 @@ private fun RenewCard(onPay: () -> Unit) {
             )
             Spacer(Modifier.height(8.dp))
             Text(
-                "Unlock full-speed access with PRO or Premium.\nPay in Toman or USD — your choice.",
+                "Unlock full-speed access with Premium.",
                 fontSize = 11.5.sp, color = Color.White.copy(alpha = 0.70f),
                 lineHeight = 17.sp, letterSpacing = 0.sp,
             )
-            Spacer(Modifier.height(16.dp))
+            Spacer(Modifier.height(14.dp))
+
+            // Currency toggle + price
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically,
+            ) {
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("tmn" to "تومان", "usd" to "USD").forEach { (code, label) ->
+                        val active = selectedCurrency == code
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(9.dp))
+                                .background(if (active) Color.White.copy(alpha = 0.30f) else Color.White.copy(alpha = 0.12f))
+                                .clickable { selectedCurrency = code }
+                                .padding(horizontal = 12.dp, vertical = 6.dp),
+                        ) {
+                            Text(
+                                label, fontSize = 11.sp, fontWeight = FontWeight.Bold,
+                                color = if (active) Color.White else Color.White.copy(alpha = 0.65f),
+                            )
+                        }
+                    }
+                }
+                Column(horizontalAlignment = Alignment.End) {
+                    Text(
+                        if (selectedCurrency == "tmn") "700,000 تومان" else "$5",
+                        fontSize = 18.sp, fontWeight = FontWeight.ExtraBold, color = Color.White,
+                        letterSpacing = (-0.5).sp,
+                    )
+                    Text(
+                        if (selectedCurrency == "tmn") "$5" else "700,000 تومان",
+                        fontSize = 10.sp, color = Color.White.copy(alpha = 0.65f),
+                    )
+                }
+            }
+
+            Spacer(Modifier.height(14.dp))
             Box(
                 modifier = Modifier
                     .fillMaxWidth()
                     .clip(RoundedCornerShape(12.dp))
                     .background(Color.White)
-                    .clickable { onPay() }
+                    .clickable { onPay(selectedCurrency) }
                     .padding(vertical = 12.dp),
                 contentAlignment = Alignment.Center,
             ) {

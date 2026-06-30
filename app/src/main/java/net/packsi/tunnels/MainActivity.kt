@@ -150,6 +150,7 @@ private fun AppRoot(
 
     var showLogPanel by remember { mutableStateOf(false) }
     var openPayment by remember { mutableStateOf(false) }
+    var openPaymentCurrency by remember { mutableStateOf("tmn") }
     var openNoAdsPayment by remember { mutableStateOf(false) }
 
     val buttonEnabled = state.status != VpnStatus.DISCONNECTING
@@ -193,7 +194,7 @@ private fun AppRoot(
                         onServerCardClick = {},
                         onShowLogs = { showLogPanel = true },
                         onGoToLogin = { tab = NavTab.PROFILE },
-                        onGoToPayment = { tab = NavTab.PROFILE; openPayment = true },
+                        onGoToPayment = { currency -> tab = NavTab.PROFILE; openPayment = true; openPaymentCurrency = currency },
                         onGoToNoAdsPayment = { tab = NavTab.PROFILE; openNoAdsPayment = true },
                         configStatus = ConfigFetchStatus.Success,
                         buttonEnabled = buttonEnabled,
@@ -207,6 +208,7 @@ private fun AppRoot(
                         onSignOut = onSignOut,
                         openPaymentOnLoad = openPayment,
                         onPaymentOpened = { openPayment = false },
+                        initialPaymentCurrency = openPaymentCurrency,
                         openNoAdsPaymentOnLoad = openNoAdsPayment,
                         onNoAdsPaymentOpened = { openNoAdsPayment = false },
                     )
