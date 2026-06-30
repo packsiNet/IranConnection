@@ -50,10 +50,3 @@ sealed class VpnConfigResult {
     object Unauthorized : VpnConfigResult()
     data class Error(val message: String) : VpnConfigResult()
 }
-
-data class AppCatalogItem(
-    val packageName: String,
-    val nameEn: String,
-    val nameFa: String,
-    val isFree: Boolean,
-)

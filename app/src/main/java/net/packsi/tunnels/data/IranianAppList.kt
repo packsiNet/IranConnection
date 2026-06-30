@@ -84,7 +84,7 @@ object IranianAppList {
         IranianApp("com.parsmobapp",                             "Pars Mobile",    "پارس موبایل",    "Services"),
         IranianApp("ir.ayantech.ghabzino",                       "Ghabzino",       "قبضینو",         "Services"),
         IranianApp("com.sibche.aspardproject.app",               "Aspard",         "اسپرد",          "Services"),
-        IranianApp("ir.zypod.app",                               "Zypod",          "زیپود",          "Services"),
+        IranianApp("ir.zypod.app",                               "Zypod",          "زیپاد",          "Services"),
         IranianApp("app.sepino",                                 "Sepino",         "سپینو",          "Services"),
         IranianApp("com.melal",                                  "Melal",          "ملل",           "Services"),
     )

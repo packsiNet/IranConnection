@@ -127,7 +127,9 @@ private fun AppRoot(
         UpdateDialog(
             newVersion = info.newVersion,
             downloadUrl = info.downloadUrl,
-            onDismiss = { showUpdateDialog = false },
+            isMajor = info.isMajor,
+            // Major = mandatory; the dialog itself ignores dismiss. Minor = "Remind Me Later".
+            onDismiss = { if (!info.isMajor) showUpdateDialog = false },
         )
     }
 
@@ -153,12 +155,15 @@ private fun AppRoot(
     var openPaymentCurrency by remember { mutableStateOf("tmn") }
     var openNoAdsPayment by remember { mutableStateOf(false) }
 
-    val buttonEnabled = state.status != VpnStatus.DISCONNECTING
+    // Stay enabled through a toggle reconnect (the button looks connected the whole time).
+    val buttonEnabled = state.reconnecting || state.status != VpnStatus.DISCONNECTING
     val onToggle: () -> Unit = {
-        when (state.status) {
-            VpnStatus.CONNECTED -> vm.stopTunnel()
-            VpnStatus.CONNECTING -> vm.cancelConnecting()
-            VpnStatus.DISCONNECTING -> {}
+        when {
+            // During a silent reconnect the button reads as connected → a tap fully disconnects.
+            state.reconnecting -> vm.cancelReconnect()
+            state.status == VpnStatus.CONNECTED -> vm.stopTunnel()
+            state.status == VpnStatus.CONNECTING -> vm.cancelConnecting()
+            state.status == VpnStatus.DISCONNECTING -> {}
             else -> {
                 // DISCONNECTED or FAILED
                 val vpnIntent = VpnService.prepare(context)
@@ -186,7 +191,8 @@ private fun AppRoot(
             Column(Modifier.weight(1f)) {
                 when (tab) {
                     NavTab.HOME -> HomeScreen(
-                        connected = state.connected,
+                        // `active` keeps the green look across a toggle reconnect; the churn shows in labels.
+                        connected = state.active,
                         statusLabel = state.statusLabel,
                         seconds = state.seconds,
                         serverIp = state.serverIp,
@@ -202,6 +208,7 @@ private fun AppRoot(
                         browserVpnEnabled = state.browserVpnEnabled,
                         onBrowserVpnChange = { vm.setBrowserVpn(it) },
                         adSessionRemaining = state.adSessionRemaining,
+                        reconnecting = state.reconnecting,
                     )
                     NavTab.APPS -> AppsScreen(onClose = { tab = NavTab.HOME })
                     NavTab.PROFILE -> ProfileScreen(
