@@ -138,7 +138,13 @@ private fun LogoWithRipple() {
             modifier = Modifier.size(72.dp).scale(pulse).clip(RoundedCornerShape(22.dp))
                 .background(Brush.linearGradient(listOf(TealLight, TealMid, TealDeep))),
             contentAlignment = Alignment.Center,
-        ) { GlobeIcon() }
+        ) {
+            Image(
+                painter = androidx.compose.ui.res.painterResource(net.packsi.tunnels.R.drawable.security_icon),
+                contentDescription = "App logo",
+                modifier = Modifier.size(56.dp).clip(RoundedCornerShape(16.dp)),
+            )
+        }
     }
 }
 
