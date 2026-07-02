@@ -37,6 +37,11 @@ object TokenStore {
     val plan: String get() = prefs.getString(K_PLAN, "") ?: ""
     val adsEnabled: Boolean get() = prefs.getBoolean(K_ADS_ENABLED, true)
 
+    /** Ads master switch is owned solely by GET /api/app/config, not the auth response. */
+    fun saveAdsEnabled(enabled: Boolean) {
+        prefs.edit().putBoolean(K_ADS_ENABLED, enabled).apply()
+    }
+
     /** Persist tokens + cached identity from a login/refresh response. */
     fun saveAuth(r: AuthResponse) {
         prefs.edit().apply {
@@ -46,7 +51,6 @@ object TokenStore {
             r.email?.let { putString(K_EMAIL, it) }
             r.fullName?.let { putString(K_FULL_NAME, it) }
             r.plan?.let { putString(K_PLAN, it) }
-            putBoolean(K_ADS_ENABLED, r.adsEnabled)
             apply()
         }
         _loggedIn.value = true

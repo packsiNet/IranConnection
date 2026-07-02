@@ -83,7 +83,10 @@ class MainActivity : ComponentActivity() {
                             failedStep = authState.loadingFailedStep,
                         )
                     AppStartState.READY ->
-                        AppRoot(onSignOut = { authViewModel.signOut() })
+                        AppRoot(
+                            onSignOut = { authViewModel.signOut() },
+                            onManualRefresh = { authViewModel.manualRefresh() },
+                        )
                 }
             }
         }
@@ -93,6 +96,7 @@ class MainActivity : ComponentActivity() {
 @Composable
 private fun AppRoot(
     onSignOut: () -> Unit = {},
+    onManualRefresh: () -> Unit = {},
     vm: VpnViewModel = viewModel(),
 ) {
     val state by vm.state.collectAsState()
@@ -199,6 +203,7 @@ private fun AppRoot(
                         onToggle = onToggle,
                         onServerCardClick = {},
                         onShowLogs = { showLogPanel = true },
+                        onManualRefresh = onManualRefresh,
                         onGoToLogin = { tab = NavTab.PROFILE },
                         onGoToPayment = { currency -> tab = NavTab.PROFILE; openPayment = true; openPaymentCurrency = currency },
                         onGoToNoAdsPayment = { tab = NavTab.PROFILE; openNoAdsPayment = true },

@@ -3,6 +3,7 @@ package net.packsi.tunnels.data.auth
 import android.content.Context
 import com.google.gson.Gson
 import net.packsi.tunnels.BuildConfig
+import net.packsi.tunnels.data.appconfig.AppConfigApi
 import net.packsi.tunnels.data.payment.PaymentApi
 import net.packsi.tunnels.data.subscription.SubscriptionApi
 import okhttp3.OkHttpClient
@@ -19,6 +20,8 @@ object ApiClient {
     lateinit var subscriptionApi: SubscriptionApi
         private set
     lateinit var paymentApi: PaymentApi
+        private set
+    lateinit var appConfigApi: AppConfigApi
         private set
 
     val gson: Gson = Gson()
@@ -58,5 +61,6 @@ object ApiClient {
         userApi = retrofit.create(UserApi::class.java)
         subscriptionApi = retrofit.create(SubscriptionApi::class.java)
         paymentApi = retrofit.create(PaymentApi::class.java)
+        appConfigApi = retrofit.create(AppConfigApi::class.java)
     }
 }

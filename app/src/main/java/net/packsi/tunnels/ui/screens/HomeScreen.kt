@@ -76,6 +76,7 @@ fun HomeScreen(
     onToggle: () -> Unit,
     onServerCardClick: () -> Unit,
     onShowLogs: () -> Unit = {},
+    onManualRefresh: () -> Unit = {},
     onGoToLogin: () -> Unit = {},
     onGoToPayment: (currency: String) -> Unit = {},
     onGoToNoAdsPayment: () -> Unit = {},
@@ -108,6 +109,7 @@ fun HomeScreen(
         HomeHeader(
             configStatus = configStatus,
             onShowLogs = onShowLogs,
+            onManualRefresh = onManualRefresh,
             isPremium = isPremium,
             onPremiumClick = { if (!isPremium) showPremiumModal = true },
             adsEnabled = adsEnabled,
@@ -221,6 +223,7 @@ fun HomeScreen(
 private fun HomeHeader(
     configStatus: ConfigFetchStatus,
     onShowLogs: () -> Unit,
+    onManualRefresh: () -> Unit,
     isPremium: Boolean,
     onPremiumClick: () -> Unit,
     adsEnabled: Boolean,
@@ -237,7 +240,7 @@ private fun HomeHeader(
             horizontalArrangement = Arrangement.spacedBy(10.dp),
         ) {
             HamburgerMenu(onShowLogs = onShowLogs)
-            ConfigIndicator(configStatus)
+            ConfigIndicator(configStatus, onManualRefresh)
         }
         Row(
             verticalAlignment = Alignment.CenterVertically,
@@ -356,9 +359,13 @@ private fun HamburgerMenu(onShowLogs: () -> Unit) {
     }
 }
 
-/** Compact config-load status chip next to the hamburger: spinner while loading, green dot online, red dot offline. */
+/**
+ * Manual-refresh button next to the hamburger. Tapping it re-runs the SplashScreen to refetch
+ * /api/app/config, the VPN config, and the apps catalog. The circular-arrow icon is tinted by the
+ * last config-load result (teal = online, red = offline); a spinner replaces it while loading.
+ */
 @Composable
-private fun ConfigIndicator(status: ConfigFetchStatus) {
+private fun ConfigIndicator(status: ConfigFetchStatus, onManualRefresh: () -> Unit) {
     val color = when (status) {
         ConfigFetchStatus.Loading -> AppColors.Gold
         ConfigFetchStatus.Success -> AppColors.Teal
@@ -368,7 +375,12 @@ private fun ConfigIndicator(status: ConfigFetchStatus) {
         Modifier
             .size(44.dp)
             .shadow(4.dp, RoundedCornerShape(14.dp))
-            .background(AppColors.CardBg, RoundedCornerShape(14.dp)),
+            .background(AppColors.CardBg, RoundedCornerShape(14.dp))
+            .clickable(
+                interactionSource = remember { MutableInteractionSource() },
+                indication = null,
+                enabled = status != ConfigFetchStatus.Loading,
+            ) { onManualRefresh() },
         contentAlignment = Alignment.Center,
     ) {
         if (status == ConfigFetchStatus.Loading) {
@@ -378,14 +390,46 @@ private fun ConfigIndicator(status: ConfigFetchStatus) {
                 strokeWidth = 2.dp,
             )
         } else {
-            // Filled dot with a soft outer halo.
+            // Soft halo behind a circular-arrow (refresh) glyph.
             Box(
-                Modifier.size(18.dp).clip(CircleShape).background(color.copy(alpha = 0.18f)),
+                Modifier.size(28.dp).clip(CircleShape).background(color.copy(alpha = 0.14f)),
                 contentAlignment = Alignment.Center,
             ) {
-                Box(Modifier.size(10.dp).clip(CircleShape).background(color))
+                RefreshIcon(color)
             }
         }
+    }
+}
+
+/** Circular-arrow "refresh" glyph: a ~300° arc with an arrowhead at its end. */
+@Composable
+private fun RefreshIcon(color: Color) {
+    Canvas(Modifier.size(16.dp)) {
+        val stroke = 2f.dp.toPx()
+        val inset = stroke / 2f + 1f
+        val arcSize = Size(size.width - inset * 2, size.height - inset * 2)
+        val startAngle = -60f
+        val sweep = 290f
+        drawArc(
+            color = color,
+            startAngle = startAngle,
+            sweepAngle = sweep,
+            useCenter = false,
+            topLeft = Offset(inset, inset),
+            size = arcSize,
+            style = Stroke(width = stroke, cap = StrokeCap.Round),
+        )
+        // Arrowhead at the arc's end point.
+        val endRad = Math.toRadians((startAngle + sweep).toDouble())
+        val cx = size.width / 2f
+        val cy = size.height / 2f
+        val r = arcSize.width / 2f
+        val tipX = cx + r * kotlin.math.cos(endRad).toFloat()
+        val tipY = cy + r * kotlin.math.sin(endRad).toFloat()
+        val head = 4.2f.dp.toPx()
+        val head2 = 3.2f.dp.toPx()
+        drawLine(color, Offset(tipX, tipY), Offset(tipX - head, tipY - head2), strokeWidth = stroke, cap = StrokeCap.Round)
+        drawLine(color, Offset(tipX, tipY), Offset(tipX + head2, tipY - head), strokeWidth = stroke, cap = StrokeCap.Round)
     }
 }
 

@@ -93,7 +93,8 @@ class AuthViewModel(app: Application) : AndroidViewModel(app) {
                         isLoggedIn = true,
                         email = r.email ?: email.trim(),
                         fullName = r.fullName ?: "",
-                        adsEnabled = r.adsEnabled,
+                        // Ads switch is owned by /api/app/config (persisted in TokenStore), not login.
+                        adsEnabled = TokenStore.adsEnabled,
                     )
                 },
                 onFailure = { e ->

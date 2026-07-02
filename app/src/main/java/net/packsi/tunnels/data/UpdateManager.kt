@@ -1,59 +1,28 @@
 package net.packsi.tunnels.data
 
-import com.google.firebase.ktx.Firebase
-import com.google.firebase.remoteconfig.ktx.remoteConfig
-import com.google.firebase.remoteconfig.ktx.remoteConfigSettings
-import kotlinx.coroutines.tasks.await
+import net.packsi.tunnels.data.appconfig.AppConfigRepository
 
 object UpdateManager {
 
-    private const val KEY_VERSION = "version"
-    private const val KEY_DOWNLOAD_URL = "download_url"
-    // Bumped on the server whenever the Iranian-apps catalog changes; a new value forces one
-    // splash run so the list is re-fetched live. NOTE: the Remote Config key is spelled exactly
-    // "IranianAppsUpdateVersion" — keep it identical to the console.
-    private const val KEY_APPS_VERSION = "IranianAppsUpdateVersion"
-
-    suspend fun checkForUpdate(currentVersion: String): UpdateInfo {
-        val config = Firebase.remoteConfig
-        config.setConfigSettingsAsync(
-            remoteConfigSettings { minimumFetchIntervalInSeconds = 0 }
-        ).await()
-        config.setDefaultsAsync(
-            mapOf(KEY_VERSION to "0.0.0", KEY_DOWNLOAD_URL to "")
-        ).await()
-
-        return try {
-            config.fetchAndActivate().await()
-            val remoteVersion = config.getString(KEY_VERSION)
-            val downloadUrl = config.getString(KEY_DOWNLOAD_URL)
-            if (isNewerVersion(remoteVersion, currentVersion)) {
-                UpdateInfo.UpdateAvailable(remoteVersion, downloadUrl, isMajor(remoteVersion, currentVersion))
-            } else {
-                UpdateInfo.UpToDate
-            }
-        } catch (e: Exception) {
-            android.util.Log.e("UpdateManager", "Remote Config fetch failed", e)
-            UpdateInfo.UpToDate
-        }
-    }
-
     /**
-     * Reads the apps-catalog version from Remote Config. Returns null on any failure (e.g. RC not
-     * reachable) so callers treat "unknown" as "no change" and don't force an unnecessary splash.
+     * Compares the remote [net.packsi.tunnels.data.appconfig.AppConfig.version] (from
+     * GET /api/app/config) against the installed version and reports whether an update is
+     * available. A MAJOR bump is mandatory. Reads the shared in-memory config so no extra network
+     * call is made when the splash flow already fetched it.
      */
-    suspend fun fetchAppsCatalogVersion(): String? {
-        val config = Firebase.remoteConfig
-        return try {
-            config.setConfigSettingsAsync(
-                remoteConfigSettings { minimumFetchIntervalInSeconds = 0 }
-            ).await()
-            config.setDefaultsAsync(mapOf(KEY_APPS_VERSION to "")).await()
-            config.fetchAndActivate().await()
-            config.getString(KEY_APPS_VERSION).ifBlank { null }
-        } catch (e: Exception) {
-            android.util.Log.e("UpdateManager", "apps version fetch failed", e)
-            null
+    suspend fun checkForUpdate(currentVersion: String): UpdateInfo {
+        val config = AppConfigRepository.getOrFetch() ?: return UpdateInfo.UpToDate
+        val remoteVersion = config.version
+        if (remoteVersion.isBlank()) return UpdateInfo.UpToDate
+
+        return if (isNewerVersion(remoteVersion, currentVersion)) {
+            UpdateInfo.UpdateAvailable(
+                newVersion = remoteVersion,
+                downloadUrl = config.downloadUrl,
+                isMajor = isMajor(remoteVersion, currentVersion),
+            )
+        } else {
+            UpdateInfo.UpToDate
         }
     }
 

@@ -4,7 +4,9 @@ import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import net.packsi.tunnels.IranVpnService
-import net.packsi.tunnels.data.UpdateManager
+import net.packsi.tunnels.data.appconfig.AppConfig
+import net.packsi.tunnels.data.appconfig.AppConfigRepository
+import net.packsi.tunnels.data.auth.TokenStore
 import net.packsi.tunnels.data.subscription.CatalogCache
 import net.packsi.tunnels.data.subscription.SubscriptionRepository
 import net.packsi.tunnels.utils.DeviceIdHelper
@@ -42,26 +44,54 @@ class DeviceAuthViewModel(private val context: Context) : ViewModel() {
                             DeviceAuthRepository.hasCachedVpnConfig(context)
 
         if (hasCachedData) {
-            // Cached session → show the app IMMEDIATELY (no splash flash). Then check the apps
-            // version in the background: only a CHANGED IranianAppsUpdateVersion re-runs the splash
-            // to refetch the catalog live; otherwise just refresh token/config silently.
+            // Cached session → show the app IMMEDIATELY (no splash flash). Then pull /api/app/config
+            // in the background: a CHANGED adsEnabled or iranianAppsUpdateVersion re-runs the splash
+            // to refresh data live; otherwise just refresh token/config silently.
             _state.update { it.copy(appStartState = AppStartState.READY) }
             viewModelScope.launch {
-                val appsVersion = UpdateManager.fetchAppsCatalogVersion()
+                val config = AppConfigRepository.fetch()
+                val adsChanged = applyAdsEnabled(config)
+                val appsVersion = appsVersionOf(config)
                 val appsVersionChanged = appsVersion != null &&
                                          appsVersion != CatalogCache.savedVersion(context)
-                if (appsVersionChanged) {
+                if (adsChanged || appsVersionChanged) {
                     loadVpnConfig(appsVersion)   // flips back to splash, refetches, returns to READY
                 } else {
                     refreshConfigInBackground()
                 }
             }
         } else {
-            // First run / cleared cache → full splash, capturing the current apps version.
+            // First run / cleared cache → full splash, capturing the current app config.
             viewModelScope.launch {
-                val appsVersion = UpdateManager.fetchAppsCatalogVersion()
-                loadVpnConfig(appsVersion)
+                val config = AppConfigRepository.fetch()
+                applyAdsEnabled(config)
+                loadVpnConfig(appsVersionOf(config))
             }
+        }
+    }
+
+    /** The iranianAppsUpdateVersion from config, or null when absent/blank (treated as "no change"). */
+    private fun appsVersionOf(config: AppConfig?): String? =
+        config?.iranianAppsUpdateVersion?.ifBlank { null }
+
+    /**
+     * Persists the ads master switch from /api/app/config (its sole source of truth) and returns
+     * whether it differs from the previously stored value. Null config → no change.
+     */
+    private fun applyAdsEnabled(config: AppConfig?): Boolean {
+        if (config == null) return false
+        val changed = config.adsEnabled != TokenStore.adsEnabled
+        TokenStore.saveAdsEnabled(config.adsEnabled)
+        return changed
+    }
+
+    /** Manual refresh (colored refresh button on Home) — always re-runs the splash to refresh
+     *  config, VPN config, and the apps catalog, regardless of whether anything changed. */
+    fun manualRefresh() {
+        viewModelScope.launch {
+            val config = AppConfigRepository.fetch()
+            applyAdsEnabled(config)
+            loadVpnConfig(appsVersionOf(config))
         }
     }
 
